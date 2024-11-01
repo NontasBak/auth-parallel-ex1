@@ -3,7 +3,8 @@
 #include <cblas.h>
 #include <math.h>
 
-void compute_distances(const double *C, const double *Q, double *D, int m, int n, int d);
+void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d);
+void printMatrix(const double *A, int m, int n);
 
 int main(int argc, char *argv[]) {
     int n = 10;
@@ -20,12 +21,7 @@ int main(int argc, char *argv[]) {
 
     // Print C
     printf("C matrix:\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < d; j++) {
-            printf("%.2f ", C[i * d + j]);
-        }
-        printf("\n");
-    }
+    printMatrix(C, m, d);
 
     // Initialize Q
     double *Q = (double *)malloc(n * d * sizeof(double));
@@ -37,27 +33,17 @@ int main(int argc, char *argv[]) {
 
     // Print Q
     printf("\nQ matrix:\n");
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < d; j++) {
-            printf("%.2f ", Q[i * d + j]);
-        }
-        printf("\n");
-    }
+    printMatrix(Q, n, d);
 
     // Allocate memory for D
     double *D = (double *)malloc(m * n * sizeof(double));
 
     // Compute the distances
-    compute_distances(C, Q, D, m, n, d);
+    computeDistances(C, Q, D, m, n, d);
 
     // Print the distances
     printf("\nD matrix:\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%.2f ", D[i * n + j]);
-        }
-        printf("\n");
-    }
+    printMatrix(D, m, n);
 
 
     // Free allocated memory
@@ -68,7 +54,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void compute_distances(const double *C, const double *Q, double *D, int m, int n, int d) {
+void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
     // Allocate memory for C_squared
     double *C_squared = (double *)malloc(m * sizeof(double));
 
@@ -97,6 +83,7 @@ void compute_distances(const double *C, const double *Q, double *D, int m, int n
     // Compute the -2*C*Q_T product using cblas_dgemm
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
 
+    // Calculate the distances
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);
@@ -107,4 +94,13 @@ void compute_distances(const double *C, const double *Q, double *D, int m, int n
     free(C_squared);
     free(Q_squared);
     free(CQ);
+}
+
+void printMatrix(const double *A, int m, int n) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%.2f ", A[i * n + j]);
+        }
+        printf("\n");
+    }
 }
