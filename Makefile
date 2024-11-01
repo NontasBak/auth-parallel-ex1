@@ -8,7 +8,7 @@ knn_sequential.o: knn_sequential.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 knn_sequential: knn_sequential.o
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lopenblas -lm
 
 # knn_pthreads.o: knn_pthreads.c
 # 	$(CC) $(CFLAGS) -o $@ -c $<
