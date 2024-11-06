@@ -1,8 +1,9 @@
 clc, clearvars, close all;
 
-n = 10;
-m = 5;
+n = 5;
+m = 10;
 d = 2;
+k = 3;
 
 % Initialize C matrix
 C = zeros(m, d);
@@ -27,7 +28,6 @@ disp('Q matrix:');
 disp(Q);
 
 % Call the knn function with C and k
-k = 3;
 knn_validate(C, Q, k);
 
 function knn_validate(C, Q, k)
