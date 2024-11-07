@@ -3,30 +3,24 @@
 #include <cblas.h>
 #include <math.h>
 
+typedef struct {
+    double distance;
+    int index;
+} Neighbor;
+
 void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d);
 void printMatrix(const double *A, int m, int n);
 void printMatrixInt(const int *A, int m, int n);
-void quickSelect(double *arr, int *indices, int left, int right, int k);
-int partition(double *arr, int *indices, int left, int right);
-void swap(double *arr, int *indices, int i, int j);
+void quickSelect(Neighbor *arr, int left, int right, int k);
+int partition(Neighbor *arr, int left, int right);
+void swap(Neighbor *arr, int i, int j);
 
 int main(int argc, char *argv[]) {
-    int n = 5; // Number of points in Q
-    int m = 10; // Number of points in C
+    int n = 100; // Number of points in Q
+    int m = 100; // Number of points in C
     int d = 2;
     int k = 3; // Number of nearest neighbors
-
-    // Initialize C
-    double *C = (double *)malloc(m * d * sizeof(double));
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < d; j++) {
-            C[i * d + j] = i + j;
-        }
-    }
-
-    // Print C
-    printf("C matrix:\n");
-    printMatrix(C, m, d);
+    int blockSize = 10; // Size of each block
 
     // Initialize Q
     double *Q = (double *)malloc(n * d * sizeof(double));
@@ -40,57 +34,75 @@ int main(int argc, char *argv[]) {
     printf("\nQ matrix:\n");
     printMatrix(Q, n, d);
 
-    // Allocate memory for D
-    double *D = (double *)malloc(m * n * sizeof(double));
-
-    // Compute the distances
-    computeDistances(C, Q, D, m, n, d);
-
-    // Print the distances
-    printf("\nD matrix:\n");
-    printMatrix(D, m, n);
-
     // Allocate memory for nearest neighbors
-    int *nearestNeighbors = (int *)malloc(n * k * sizeof(int));
+    Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
 
-    // Find the k nearest neighbors for each point in Q
-    for (int i = 0; i < n; i++) {
-        double *distances = (double *)malloc(m * sizeof(double));
-        int *indices = (int *)malloc(m * sizeof(int));
-        for (int j = 0; j < m; j++) {
-            distances[j] = D[j * n + i];
-            indices[j] = j;
+    // Initialize nearestNeighbors with large distances
+    for (int i = 0; i < n * k; i++) {
+        nearestNeighbors[i].distance = INFINITY;
+        nearestNeighbors[i].index = -1;
+    }
+
+    // Process blocks of C
+    for (int blockStart = 0; blockStart < m; blockStart += blockSize) {
+        int currentBlockSize = (blockStart + blockSize > m) ? (m - blockStart) : blockSize;
+
+        // Initialize C block
+        double *C = (double *)malloc(currentBlockSize * d * sizeof(double));
+        for (int i = 0; i < currentBlockSize; i++) {
+            for (int j = 0; j < d; j++) {
+                C[i * d + j] = (blockStart + i) + j;
+            }
         }
 
-        // // Print distances and indices before quick select
-        // printf("\nDistances before quick select for point %d:\n", i);
-        // printMatrix(distances, 1, m);
-        // printf("Indices before quick select for point %d:\n", i);
-        // printMatrixInt(indices, 1, m);
+        // Print C block
+        printf("\nC block matrix:\n");
+        printMatrix(C, currentBlockSize, d);
 
-        quickSelect(distances, indices, 0, m - 1, k);
+        // Allocate memory for D block
+        double *D = (double *)malloc(currentBlockSize * n * sizeof(double));
 
-        // // Print distances and indices after quick select
-        // printf("\nDistances after quick select for point %d:\n", i);
-        // printMatrix(distances, 1, m);
-        // printf("Indices after quick select for point %d:\n", i);
-        // printMatrixInt(indices, 1, m);
+        // Compute the distances
+        computeDistances(C, Q, D, currentBlockSize, n, d);
 
-        for (int j = 0; j < k; j++) {
-            nearestNeighbors[i * k + j] = indices[j];
+        // Print the distances
+        printf("\nD block matrix:\n");
+        printMatrix(D, currentBlockSize, n);
+
+        // Find the k nearest neighbors for each point in Q
+        for (int i = 0; i < n; i++) {
+            Neighbor *neighbors = (Neighbor *)malloc(currentBlockSize * sizeof(Neighbor));
+            for (int j = 0; j < currentBlockSize; j++) {
+                neighbors[j].distance = D[j * n + i];
+                neighbors[j].index = blockStart + j;
+            }
+
+            quickSelect(neighbors, 0, currentBlockSize - 1, k);
+
+            for (int j = 0; j < k; j++) {
+                if (neighbors[j].distance < nearestNeighbors[i * k + j].distance) {
+                    nearestNeighbors[i * k + j] = neighbors[j];
+                }
+            }
+            free(neighbors);
         }
-        free(distances);
-        free(indices);
+
+        // Free allocated memory for C block and D block
+        free(C);
+        free(D);
     }
 
     // Print the nearest neighbors
     printf("\nNearest neighbors matrix:\n");
-    printMatrixInt(nearestNeighbors, n, k);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < k; j++) {
+            printf("(%d, %.2f) ", nearestNeighbors[i * k + j].index, nearestNeighbors[i * k + j].distance);
+        }
+        printf("\n");
+    }
 
     // Free allocated memory
-    free(C);
     free(Q);
-    free(D);
     free(nearestNeighbors);
 
     return 0;
@@ -156,39 +168,35 @@ void printMatrixInt(const int *A, int m, int n) {
     }
 }
 
-void quickSelect(double *arr, int *indices, int left, int right, int k) {
+void quickSelect(Neighbor *arr, int left, int right, int k) {
     if (left == right) return;
 
-    int pivotIndex = partition(arr, indices, left, right);
+    int pivotIndex = partition(arr, left, right);
 
     if (k == pivotIndex) {
         return;
     } else if (k < pivotIndex) {
-        quickSelect(arr, indices, left, pivotIndex - 1, k);
+        quickSelect(arr, left, pivotIndex - 1, k);
     } else {
-        quickSelect(arr, indices, pivotIndex + 1, right, k);
+        quickSelect(arr, pivotIndex + 1, right, k);
     }
 }
 
-int partition(double *arr, int *indices, int left, int right) {
-    double pivot = arr[right];
+int partition(Neighbor *arr, int left, int right) {
+    double pivot = arr[right].distance;
     int pivotIndex = left;
     for (int i = left; i < right; i++) {
-        if (arr[i] < pivot) {
-            swap(arr, indices, i, pivotIndex);
+        if (arr[i].distance < pivot) {
+            swap(arr, i, pivotIndex);
             pivotIndex++;
         }
     }
-    swap(arr, indices, right, pivotIndex);
+    swap(arr, right, pivotIndex);
     return pivotIndex;
 }
 
-void swap(double *arr, int *indices, int i, int j) {
-    double temp = arr[i];
+void swap(Neighbor *arr, int i, int j) {
+    Neighbor temp = arr[i];
     arr[i] = arr[j];
     arr[j] = temp;
-
-    int tempIndex = indices[i];
-    indices[i] = indices[j];
-    indices[j] = tempIndex;
 }

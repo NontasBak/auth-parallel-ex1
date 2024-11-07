@@ -1,7 +1,7 @@
 clc, clearvars, close all;
 
-n = 5;
-m = 10;
+n = 100;
+m = 100;
 d = 2;
 k = 3;
 
