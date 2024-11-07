@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -I. -Wall
 
 #Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
-all: knn_sequential
+all: knn_sequential knn_openmp
 
 knn_sequential.o: knn_sequential.c
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -16,11 +16,11 @@ knn_sequential: knn_sequential.o
 # knn_pthreads: knn_pthreads.o
 # 	$(CC) $(CFLAGS) -o $@ $^ -lpthread
 
-# knn_openmp.o: knn_openmp.c
-# 	$(CC) $(CFLAGS) -fopenmp -o $@ -c $<
+knn_openmp.o: knn_openmp.c
+	$(CC) $(CFLAGS) -fopenmp -o $@ -c $<
 
-# knn_openmp: knn_openmp.o
-# 	$(CC) $(CFLAGS) -fopenmp -o $@ $^
+knn_openmp: knn_openmp.o
+	$(CC) $(CFLAGS) -fopenmp -o $@ $^ -lopenblas -lm
 
 # knn_opencilk.o: knn_opencilk.c
 # 	$(CC) $(CFLAGS) -fcilkplus -o $@ -c $<
@@ -30,5 +30,5 @@ knn_sequential: knn_sequential.o
 
 #Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
 clean:
-	rm -f *.o knn_sequential
+	rm -f *.o knn_sequential knn_openmp
 

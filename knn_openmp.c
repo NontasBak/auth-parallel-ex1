@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <cblas.h>
 #include <math.h>
+#include <omp.h> // Include OpenMP header
 
 typedef struct {
     double distance;
@@ -31,8 +32,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Print Q
-    printf("\nQ matrix:\n");
-    printMatrix(Q, n, d);
+    // printf("\nQ matrix:\n");
+    // printMatrix(Q, n, d);
 
     // Allocate memory for nearest neighbors
     Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
@@ -44,6 +45,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Process blocks of C
+    #pragma omp parallel for schedule(dynamic) // Parallelize the outer loop
     for (int blockStart = 0; blockStart < m; blockStart += blockSize) {
         int currentBlockSize = (blockStart + blockSize > m) ? (m - blockStart) : blockSize;
 
@@ -56,8 +58,8 @@ int main(int argc, char *argv[]) {
         }
 
         // Print C block
-        printf("\nC block matrix:\n");
-        printMatrix(C, currentBlockSize, d);
+        // printf("\nC block matrix:\n");
+        // printMatrix(C, currentBlockSize, d);
 
         // Allocate memory for D block
         double *D = (double *)malloc(currentBlockSize * n * sizeof(double));
@@ -66,10 +68,11 @@ int main(int argc, char *argv[]) {
         computeDistances(C, Q, D, currentBlockSize, n, d);
 
         // Print the distances
-        printf("\nD block matrix:\n");
-        printMatrix(D, currentBlockSize, n);
+        // printf("\nD block matrix:\n");
+        // printMatrix(D, currentBlockSize, n);
 
         // Find the k nearest neighbors for each point in Q
+        #pragma omp parallel for // Parallelize the loop over points in Q
         for (int i = 0; i < n; i++) {
             Neighbor *neighbors = (Neighbor *)malloc(currentBlockSize * sizeof(Neighbor));
             for (int j = 0; j < currentBlockSize; j++) {
@@ -116,6 +119,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     double *Q_squared = (double *)malloc(n * sizeof(double));
 
     // Calculate C_squared
+    #pragma omp parallel for // Parallelize the loop over points in C
     for (int i = 0; i < m; i++) {
         C_squared[i] = 0;
         for (int j = 0; j < d; j++) {
@@ -124,6 +128,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     }
 
     // Calculate Q_squared
+    #pragma omp parallel for // Parallelize the loop over points in Q
     for (int i = 0; i < n; i++) {
         Q_squared[i] = 0;
         for (int j = 0; j < d; j++) {
@@ -138,6 +143,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
 
     // Calculate the distances
+    #pragma omp parallel for collapse(2) // Parallelize the nested loops
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);
