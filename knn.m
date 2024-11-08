@@ -1,7 +1,7 @@
 clc, clearvars, close all;
 
-n = 100;
-m = 100;
+n = 100000;
+m = 100000;
 d = 2;
 k = 3;
 
@@ -22,20 +22,20 @@ for i = 1:n
 end
 
 % Display matrices
-disp('C matrix:');
-disp(C);
-disp('Q matrix:');
-disp(Q);
+% disp('C matrix:');
+% disp(C);
+% disp('Q matrix:');
+% disp(Q);
 
 % Call the knn function with C and k
 knn_validate(C, Q, k);
 
 function knn_validate(C, Q, k)
-    D = sqrt(bsxfun(@plus, sum(C.^2, 2), sum(Q.^2, 2)') - 2 * (C * Q'));
+    % D = sqrt(bsxfun(@plus, sum(C.^2, 2), sum(Q.^2, 2)') - 2 * (C * Q'));
 
     % Display the distance matrix
-    disp('Distance matrix D:');
-    disp(D);
+    % disp('Distance matrix D:');
+    % disp(D);
     
     % Use MATLAB's knnsearch for validation
     [idx, dist] = knnsearch(C, Q, 'k', k);
