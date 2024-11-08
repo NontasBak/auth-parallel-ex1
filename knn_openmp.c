@@ -17,23 +17,23 @@ int partition(Neighbor *arr, int left, int right);
 void swap(Neighbor *arr, int i, int j);
 
 int main(int argc, char *argv[]) {
-    int n = 1000; // Number of points in Q
-    int m = 1000; // Number of points in C
+    int n = 10000; // Number of points in Q
+    int m = 10000; // Number of points in C
     int d = 2;
     int k = 3; // Number of nearest neighbors
-    int blockSize = 100; // Size of each block
+    int numBlocks = 10; // Number of blocks
 
-    // Initialize Q
-    double *Q = (double *)malloc(n * d * sizeof(double));
-    for (int i = 0; i < n; i++) {
+    // Initialize C and Q (since C == Q)
+    double *C = (double *)malloc(m * d * sizeof(double));
+    for (int i = 0; i < m; i++) {
         for (int j = 0; j < d; j++) {
-            Q[i * d + j] = i + j;
+            C[i * d + j] = i + j;
         }
     }
 
-    // Print Q
-    // printf("\nQ matrix:\n");
-    // printMatrix(Q, n, d);
+    // Print C
+    // printf("\nC matrix:\n");
+    // printMatrix(C, m, d);
 
     // Allocate memory for nearest neighbors
     Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
@@ -44,55 +44,63 @@ int main(int argc, char *argv[]) {
         nearestNeighbors[i].index = -1;
     }
 
-    // Process blocks of C
-    #pragma omp parallel for schedule(dynamic) // Parallelize the outer loop
-    for (int blockStart = 0; blockStart < m; blockStart += blockSize) {
-        int currentBlockSize = (blockStart + blockSize > m) ? (m - blockStart) : blockSize;
+    // Process blocks of C and Q
+    #pragma omp parallel for collapse(2) // Parallelize the outer loops
+    for (int block1 = 0; block1 < numBlocks; block1++) {
+        for (int block2 = block1; block2 < numBlocks; block2++) {
+            int currentBlockSize1 = (n + numBlocks - 1) / numBlocks;
+            int currentBlockSize2 = (n + numBlocks - 1) / numBlocks;
 
-        // Initialize C block
-        double *C = (double *)malloc(currentBlockSize * d * sizeof(double));
-        for (int i = 0; i < currentBlockSize; i++) {
-            for (int j = 0; j < d; j++) {
-                C[i * d + j] = (blockStart + i) + j;
-            }
-        }
+            // Use only 50% of the points in each block
+            int sampleSize1 = currentBlockSize1 / 2;
+            int sampleSize2 = currentBlockSize2 / 2;
 
-        // Print C block
-        // printf("\nC block matrix:\n");
-        // printMatrix(C, currentBlockSize, d);
+            // Allocate memory for D block
+            double *D = (double *)malloc(sampleSize1 * sampleSize2 * sizeof(double));
 
-        // Allocate memory for D block
-        double *D = (double *)malloc(currentBlockSize * n * sizeof(double));
+            // Compute the distances
+            computeDistances(C + block1 * currentBlockSize1 * d, C + block2 * currentBlockSize2 * d, D, sampleSize1, sampleSize2, d);
 
-        // Compute the distances
-        computeDistances(C, Q, D, currentBlockSize, n, d);
-
-        // Print the distances
-        // printf("\nD block matrix:\n");
-        // printMatrix(D, currentBlockSize, n);
-
-        // Find the k nearest neighbors for each point in Q
-        #pragma omp parallel for // Parallelize the loop over points in Q
-        for (int i = 0; i < n; i++) {
-            Neighbor *neighbors = (Neighbor *)malloc(currentBlockSize * sizeof(Neighbor));
-            for (int j = 0; j < currentBlockSize; j++) {
-                neighbors[j].distance = D[j * n + i];
-                neighbors[j].index = blockStart + j;
-            }
-
-            quickSelect(neighbors, 0, currentBlockSize - 1, k);
-
-            for (int j = 0; j < k; j++) {
-                if (neighbors[j].distance < nearestNeighbors[i * k + j].distance) {
-                    nearestNeighbors[i * k + j] = neighbors[j];
+            // Find the k nearest neighbors for each point in Q1 and Q2 blocks
+            #pragma omp parallel for // Parallelize the loop over points in Q1 block
+            for (int i = 0; i < sampleSize1; i++) {
+                Neighbor *neighbors = (Neighbor *)malloc(sampleSize2 * sizeof(Neighbor));
+                for (int j = 0; j < sampleSize2; j++) {
+                    neighbors[j].distance = D[i * sampleSize2 + j];
+                    neighbors[j].index = block2 * currentBlockSize2 + j * 2; // Non-sequential points
                 }
-            }
-            free(neighbors);
-        }
 
-        // Free allocated memory for C block and D block
-        free(C);
-        free(D);
+                quickSelect(neighbors, 0, sampleSize2 - 1, k);
+
+                for (int j = 0; j < k; j++) {
+                    if (neighbors[j].distance < nearestNeighbors[(block1 * currentBlockSize1 + i * 2) * k + j].distance) {
+                        nearestNeighbors[(block1 * currentBlockSize1 + i * 2) * k + j] = neighbors[j];
+                    }
+                }
+                free(neighbors);
+            }
+
+            #pragma omp parallel for // Parallelize the loop over points in Q2 block
+            for (int i = 0; i < sampleSize2; i++) {
+                Neighbor *neighbors = (Neighbor *)malloc(sampleSize1 * sizeof(Neighbor));
+                for (int j = 0; j < sampleSize1; j++) {
+                    neighbors[j].distance = D[j * sampleSize2 + i];
+                    neighbors[j].index = block1 * currentBlockSize1 + j * 2; // Non-sequential points
+                }
+
+                quickSelect(neighbors, 0, sampleSize1 - 1, k);
+
+                for (int j = 0; j < k; j++) {
+                    if (neighbors[j].distance < nearestNeighbors[(block2 * currentBlockSize2 + i * 2) * k + j].distance) {
+                        nearestNeighbors[(block2 * currentBlockSize2 + i * 2) * k + j] = neighbors[j];
+                    }
+                }
+                free(neighbors);
+            }
+
+            // Free allocated memory for D block
+            free(D);
+        }
     }
 
     // Print the nearest neighbors
@@ -105,7 +113,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Free allocated memory
-    free(Q);
+    free(C);
     free(nearestNeighbors);
 
     return 0;

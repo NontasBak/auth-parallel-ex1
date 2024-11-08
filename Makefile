@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -I. -Wall
+CFLAGS = -I. -Wall -O3
 
 #Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
 all: knn_sequential knn_openmp
