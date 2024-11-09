@@ -60,14 +60,14 @@ int loadMatFile(const char *filename, const char *varname, double *C, int d, int
     // Initialize C with data from MAT file
     printf("Initializing matrix\n");
     fflush(stdout);
-    if (strcmp(datatype, "int") == 0)
+    if (strcmp(datatype, "float") == 0)
     {
-        int *intData = (int *)data;
+        float *floatData = (float *)data;
         for (int i = 0; i < m; i++)
         {
             for (int j = 0; j < d; j++)
             {
-                C[i * d + j] = (double)intData[i * d + j]; // Accessing data in column-major order and converting to double
+                C[i * d + j] = (double)floatData[i * d + j]; // Accessing data in column-major order and converting to double
             }
         }
     }

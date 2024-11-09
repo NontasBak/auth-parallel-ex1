@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     double *C = (double *)malloc(m * d * sizeof(double));
 
     // Load MAT file
-    loadMatFile("train_data.mat", "train_data", C, d, m, "int");
+    loadMatFile("train_data.mat", "train_data", C, d, m, "float");
 
     printf("Initialized C matrix with %d points\n", m);
 
@@ -106,8 +106,8 @@ int main(int argc, char *argv[]) {
             int currentBlockSize1 = (n + numBlocks - 1) / numBlocks;
             int currentBlockSize2 = (n + numBlocks - 1) / numBlocks;
 
-            int sampleSize1 = currentBlockSize1 / 4;
-            int sampleSize2 = currentBlockSize2 / 4;
+            int sampleSize1 = currentBlockSize1 / 2;
+            int sampleSize2 = currentBlockSize2 / 2;
 
             // Allocate memory for D block
             double *D = (double *)malloc(sampleSize1 * sampleSize2 * sizeof(double));
