@@ -298,12 +298,20 @@ void selectRandomPoints(int *indices, int blockSize, int sampleSize) {
 
 void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, int globalIndex, int k) {
     for (int j = 0; j < k; j++) {
-        #pragma omp critical
-        {
-            if (neighbors[j].distance < nearestNeighbors[globalIndex * k + j].distance) {
-                nearestNeighbors[globalIndex * k + j] = neighbors[j];
+            // Find the position to insert the new neighbor
+            int maxIndex = -1;
+            double maxDistance = -1.0;
+            for (int l = 0; l < k; l++) {
+                if (nearestNeighbors[globalIndex * k + l].distance > maxDistance) {
+                    maxDistance = nearestNeighbors[globalIndex * k + l].distance;
+                    maxIndex = l;
+                }
             }
-        }
+            // If the new neighbor is closer, replace the farthest neighbor
+            if (neighbors[j].distance < maxDistance) {
+                nearestNeighbors[globalIndex * k + maxIndex] = neighbors[j];
+            }
+        
     }
 }
 
