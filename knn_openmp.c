@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <cblas.h>
 #include <math.h>
-#include <omp.h> // Include OpenMP header
-#include <time.h> // Include time header for random number generation
+#include <omp.h>
+#include <time.h>
+#include <matio.h>
+#include "mat_loader.h"
 
 typedef struct {
     double distance;
@@ -21,22 +23,20 @@ void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, in
 void shuffleIndices(int *indices, int size);
 
 int main(int argc, char *argv[]) {
-    int n = 100000; // Number of points in Q
-    int m = 100000; // Number of points in C
-    int d = 2;
-    int k = 3; // Number of nearest neighbors
+    int n = 1000000; // Number of points in Q
+    int m = 1000000; // Number of points in C
+    int d = 128;
+    int k = 100; // Number of nearest neighbors
     int numBlocks = 100; // Number of blocks
 
     // Initialize random seed
     srand(time(NULL));
 
-    // Initialize C and Q (since C == Q)
+    // Allocate memory for C
     double *C = (double *)malloc(m * d * sizeof(double));
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < d; j++) {
-            C[i * d + j] = i + j;
-        }
-    }
+
+    // Load MAT file
+    loadMatFile("train_data.mat", "train_data", C, d, m, "int");
 
     printf("Initialized C matrix with %d points\n", m);
 
@@ -55,6 +55,9 @@ int main(int argc, char *argv[]) {
     int *shuffledIndices = (int *)malloc(n * sizeof(int));
     for (int i = 0; i < n; i++) shuffledIndices[i] = i;
     shuffleIndices(shuffledIndices, n);
+
+    // Start timing
+    double startTime = omp_get_wtime();
 
     // Process blocks of C and Q
     #pragma omp parallel for // Parallelize the outer loop
@@ -103,8 +106,8 @@ int main(int argc, char *argv[]) {
             int currentBlockSize1 = (n + numBlocks - 1) / numBlocks;
             int currentBlockSize2 = (n + numBlocks - 1) / numBlocks;
 
-            int sampleSize1 = currentBlockSize1 / 2;
-            int sampleSize2 = currentBlockSize2 / 2;
+            int sampleSize1 = currentBlockSize1 / 4;
+            int sampleSize2 = currentBlockSize2 / 4;
 
             // Allocate memory for D block
             double *D = (double *)malloc(sampleSize1 * sampleSize2 * sizeof(double));
@@ -139,7 +142,7 @@ int main(int argc, char *argv[]) {
                 Neighbor *neighbors = (Neighbor *)malloc(sampleSize2 * sizeof(Neighbor));
                 for (int j = 0; j < sampleSize2; j++) {
                     neighbors[j].distance = D[i * sampleSize2 + j];
-                    neighbors[j].index = shuffledIndices[block2 * currentBlockSize2 + indices2[j]]; // Non-sequential points
+                    neighbors[j].index = shuffledIndices[block2 * currentBlockSize2 + indices2[j]];
                 }
 
                 quickSelect(neighbors, 0, sampleSize2 - 1, k);
@@ -154,7 +157,7 @@ int main(int argc, char *argv[]) {
                 Neighbor *neighbors = (Neighbor *)malloc(sampleSize1 * sizeof(Neighbor));
                 for (int j = 0; j < sampleSize1; j++) {
                     neighbors[j].distance = D[j * sampleSize2 + i];
-                    neighbors[j].index = shuffledIndices[block1 * currentBlockSize1 + indices1[j]]; // Non-sequential points
+                    neighbors[j].index = shuffledIndices[block1 * currentBlockSize1 + indices1[j]];
                 }
 
                 quickSelect(neighbors, 0, sampleSize1 - 1, k);
@@ -172,15 +175,54 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Print the nearest neighbors
-    printf("\nNearest neighbors matrix:\n");
-    for (int i = 0; i < n; i++) {
-        printf("Point %d: " , i);
+    // End timing
+    double endTime = omp_get_wtime();
+    double elapsedTime = endTime - startTime;
+
+    // Load ground truth neighbors from MAT file
+    int numTestQueries = 10000; // First 10k queries
+    double *groundTruth = (double *)malloc(numTestQueries * k * sizeof(double));
+    loadMatFile("knn_neighbors.mat", "knn_neighbors", groundTruth, k, numTestQueries, "double");
+
+    
+    // Calculate Recall for 0-based indexing
+    int correctNeighbors = 0;
+
+    for (int i = 0; i < numTestQueries; i++) {
         for (int j = 0; j < k; j++) {
-            printf("(%d, %.2f) ", nearestNeighbors[i * k + j].index, nearestNeighbors[i * k + j].distance);
+            for (int l = 0; l < k; l++) {
+                if (nearestNeighbors[i * k + j].index == (int)groundTruth[i * k + l] - 1) {
+                    correctNeighbors++;
+                    break;
+                }
+            }
         }
-        printf("\n");
     }
+    int totalNeighbors = numTestQueries * k;
+    double recall0 = (double)correctNeighbors / totalNeighbors * 100.0;
+
+    // Calculate Queries per second
+    double queriesPerSecond = n / elapsedTime;
+
+    // for(int i = 0; i < numTestQueries; i++) {
+    //     for (int j = 0; j < k; j++) {
+    //         printf("%lf\n", groundTruth[i * k + j]);
+    //     }
+    // }
+
+    // Print the nearest neighbors (only first 10k)
+    // printf("\nNearest neighbors matrix:\n");
+    // for (int i = 0; i < 10000; i++) {
+    //     printf("Point %d: " , i);
+    //     for (int j = 0; j < k; j++) {
+    //         printf("(%d, %.2f) ", nearestNeighbors[i * k + j].index, nearestNeighbors[i * k + j].distance);
+    //     }
+    //     printf("\n");
+    // }
+
+    // Print Recall and Queries per second
+    printf("\nRecall: %.4f%%\n", recall0);
+    printf("Queries per second: %.2f\n", queriesPerSecond);
 
     // Free allocated memory
     free(shuffledIndices);
@@ -298,20 +340,19 @@ void selectRandomPoints(int *indices, int blockSize, int sampleSize) {
 
 void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, int globalIndex, int k) {
     for (int j = 0; j < k; j++) {
-            // Find the position to insert the new neighbor
-            int maxIndex = -1;
-            double maxDistance = -1.0;
-            for (int l = 0; l < k; l++) {
-                if (nearestNeighbors[globalIndex * k + l].distance > maxDistance) {
-                    maxDistance = nearestNeighbors[globalIndex * k + l].distance;
-                    maxIndex = l;
-                }
+        // Find the position to insert the new neighbor
+        int maxIndex = -1;
+        double maxDistance = -1.0;
+        for (int l = 0; l < k; l++) {
+            if (nearestNeighbors[globalIndex * k + l].distance > maxDistance) {
+                maxDistance = nearestNeighbors[globalIndex * k + l].distance;
+                maxIndex = l;
             }
-            // If the new neighbor is closer, replace the farthest neighbor
-            if (neighbors[j].distance < maxDistance) {
-                nearestNeighbors[globalIndex * k + maxIndex] = neighbors[j];
-            }
-        
+        }
+        // If the new neighbor is closer, replace the farthest neighbor
+        if (neighbors[j].distance < maxDistance) {
+            nearestNeighbors[globalIndex * k + maxIndex] = neighbors[j];
+        }
     }
 }
 

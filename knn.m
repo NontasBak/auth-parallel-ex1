@@ -1,47 +1,29 @@
 clc, clearvars, close all;
 
-n = 100000;
-m = 100000;
-d = 2;
-k = 3;
+% Load train_data.mat
+load('train_data.mat', 'train_data');
+load('neighbors_data.mat', 'neighbors_data');
+
+% Parameters
+n = 10000; % First 10k queries
+m = size(train_data, 2); % Number of points in C
+d = size(train_data, 1); % Dimensionality
+k = 100; % Number of nearest neighbors
 
 % Initialize C matrix
-C = zeros(m, d);
-for i = 1:m
-    for j = 1:d
-        C(i, j) = i - 1 + j - 1;
-    end
-end
+C = train_data';
 
-% Initialize Q matrix
-Q = zeros(n, d);
-for i = 1:n
-    for j = 1:d
-        Q(i, j) = i - 1 + j - 1;
-    end
-end
+% Initialize Q matrix (first 10k points from C)
+Q = C(1:n, :);
 
-% Display matrices
-% disp('C matrix:');
-% disp(C);
-% disp('Q matrix:');
-% disp(Q);
+% Use MATLAB's knnsearch for validation
+[idx, dist] = knnsearch(C, Q, 'k', k);
 
-% Call the knn function with C and k
-knn_validate(C, Q, k);
+% Save the indices of the nearest neighbors to knn_neighbors.mat
+knn_neighbors = idx';
+save('knn_neighbors.mat', 'knn_neighbors');
 
-function knn_validate(C, Q, k)
-    % D = sqrt(bsxfun(@plus, sum(C.^2, 2), sum(Q.^2, 2)') - 2 * (C * Q'));
-
-    % Display the distance matrix
-    % disp('Distance matrix D:');
-    % disp(D);
-    
-    % Use MATLAB's knnsearch for validation
-    [idx, dist] = knnsearch(C, Q, 'k', k);
-    
-    disp('MATLAB k-NN Indices:');
-    disp(idx);
-    disp('MATLAB k-NN Distances:');
-    disp(dist);
-end
+disp('MATLAB k-NN Indices:');
+disp(idx);
+disp('MATLAB k-NN Distances:');
+disp(dist);
