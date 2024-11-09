@@ -1,12 +1,6 @@
 CC = gcc
 CFLAGS = -I. -Wall -O3
 
-MATLAB_ROOT = /usr/local/MATLAB/R2024b
-MATLAB_INCLUDES = -I$(MATLAB_ROOT)/extern/include
-MATLAB_LIBS = -L$(MATLAB_ROOT)/bin/glnxa64 -lmat -lmx -leng -lmex
-
-SYSTEM_LIBSTDCXX = /usr/lib/x86_64-linux-gnu/libstdc++.so.6
-
 #Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
 all: knn_sequential knn_openmp
 
@@ -23,13 +17,13 @@ knn_sequential: knn_sequential.o
 # 	$(CC) $(CFLAGS) -o $@ $^ -lpthread
 
 knn_openmp.o: knn_openmp.c
-	$(CC) $(CFLAGS) $(MATLAB_INCLUDES) -fopenmp -o $@ -c $<
+	$(CC) $(CFLAGS) -fopenmp -o $@ -c $<
 
 knn_openmp: knn_openmp.o mat_loader.o
-	LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$(MATLAB_ROOT)/bin/glnxa64 $(CC) $(CFLAGS) -fopenmp -o $@ $^ -lopenblas -lm -lmatio
+	$(CC) $(CFLAGS) -fopenmp -o $@ $^ -lopenblas -lm -lmatio
 
 mat_loader.o: mat_loader.c
-	$(CC) $(CFLAGS) $(MATLAB_INCLUDES) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 # knn_opencilk.o: knn_opencilk.c
 # 	$(CC) $(CFLAGS) -fcilkplus -o $@ -c $<
