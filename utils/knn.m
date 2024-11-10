@@ -1,8 +1,8 @@
 clc, clearvars, close all;
 
 % Load train_data.mat
-load('train_data.mat', 'train_data');
-load('neighbors_data.mat', 'neighbors_data');
+load('../data/train_data.mat', 'train_data');
+load('../data/neighbors_data.mat', 'neighbors_data');
 
 % Parameters
 n = 10000; % First 10k queries
@@ -21,7 +21,7 @@ Q = C(1:n, :);
 
 % Save the indices of the nearest neighbors to knn_neighbors.mat
 knn_neighbors = idx';
-save('knn_neighbors.mat', 'knn_neighbors');
+save('../data/knn_neighbors.mat', 'knn_neighbors');
 
 disp('MATLAB k-NN Indices:');
 disp(idx);

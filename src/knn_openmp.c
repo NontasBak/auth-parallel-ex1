@@ -5,7 +5,7 @@
 #include <omp.h>
 #include <time.h>
 #include <matio.h>
-#include "mat_loader.h"
+#include "../utils/mat_loader.h"
 #include "knn.h"
 
 typedef struct {
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
     int *idx = (int *)malloc(n * k * sizeof(int));
 
     // Load .mat file
-    loadMatFile("train_data.mat", "train_data", C, d, m, "float");
+    loadMatFile("data/train_data.mat", "train_data", C, d, m, "float");
     
     double startTime = omp_get_wtime();
 
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
 
     int numTestQueries = 10000; // First 10k queries
     double *groundTruth = (double *)malloc(numTestQueries * k * sizeof(double));
-    loadMatFile("knn_neighbors.mat", "knn_neighbors", groundTruth, k, numTestQueries, "double");
+    loadMatFile("data/knn_neighbors.mat", "knn_neighbors", groundTruth, k, numTestQueries, "double");
 
     int correctNeighbors = 0;
     for (int i = 0; i < numTestQueries; i++) {

@@ -1,13 +1,13 @@
 clc, clearvars, close all;
 
 % Load "train" dataset from HDF5 file
-neighbors_data = h5read('sift-128-euclidean.hdf5', '/neighbors');
+neighbors_data = h5read('../data/sift-128-euclidean.hdf5', '/neighbors');
 
 % Save "train" dataset to a .mat file
-save('neighbors_data.mat', 'neighbors_data');
+save('../data/neighbors_data.mat', 'neighbors_data');
 
 % Load and print the contents of the .mat file
-loaded_data = load('neighbors_data.mat');
+loaded_data = load('../data/neighbors_data.mat');
 disp('Contents of neighbors_data.mat:');
 %disp(loaded_data.neighbors_data);
 disp(size(loaded_data.neighbors_data));

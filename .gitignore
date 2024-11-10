@@ -1,4 +1,2 @@
 sift-128-euclidean.hdf5
 train_data.mat
-neighbors_data.mat
-knn_neighbors.mat
