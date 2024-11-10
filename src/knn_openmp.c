@@ -26,7 +26,6 @@ void shuffleIndices(int *indices, int size);
 void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, float subBlockRatio) {
     srand(time(NULL));
 
-    // Allocate memory for nearest neighbors
     Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
 
     // Initialize nearestNeighbors
@@ -81,10 +80,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
         for (int block2 = block1 + 1; block2 < numBlocks; block2++) {
             int sampleSize = blockSize * subBlockRatio;
 
-            // Allocate memory for D block
             double *D = (double *)malloc(sampleSize * sampleSize * sizeof(double));
-
-            // Compute the distances using 50% of the points in each block
             double *C_block1 = (double *)malloc(sampleSize * d * sizeof(double));
             double *C_block2 = (double *)malloc(sampleSize * d * sizeof(double));
 
@@ -138,7 +134,6 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
                 free(neighbors);
             }
 
-            // Free allocated memory for D block
             free(D);
             free(C_block1);
             free(C_block2);
@@ -155,7 +150,6 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
         }
     }
 
-    // Free allocated memory
     free(shuffledIndices);
     free(nearestNeighbors);
 }
@@ -165,7 +159,7 @@ int main(int argc, char *argv[]) {
     int m = 1000000; // Number of points in C
     int d = 128;
     int k = 100; // Number of nearest neighbors
-    int numBlocks = 100; // Number of blocks
+    int numBlocks = 100;
     float subBlockRatio = 0.05;
     int numThreads = 4;
 
@@ -220,7 +214,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     double *Q_squared = (double *)malloc(n * sizeof(double));
 
     // Calculate C_squared
-    #pragma omp parallel for // Parallelize the loop over points in C
+    #pragma omp parallel for
     for (int i = 0; i < m; i++) {
         C_squared[i] = 0;
         for (int j = 0; j < d; j++) {
@@ -229,7 +223,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     }
 
     // Calculate Q_squared
-    #pragma omp parallel for // Parallelize the loop over points in Q
+    #pragma omp parallel for
     for (int i = 0; i < n; i++) {
         Q_squared[i] = 0;
         for (int j = 0; j < d; j++) {
@@ -244,7 +238,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
 
     // Calculate the distances
-    // #pragma omp parallel for collapse(2) // Parallelize the nested loops
+    #pragma omp parallel for collapse(2)
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);

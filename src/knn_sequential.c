@@ -17,10 +17,9 @@ int partition(Neighbor *arr, int left, int right);
 void swap(Neighbor *arr, int i, int j);
 
 void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, int *idx, int numBlocks) {
-    // Allocate memory for distances and indices
     Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
 
-    // Initialize nearestNeighbors with large distances
+    // Initialize nearestNeighbors
     for (int i = 0; i < n * k; i++) {
         nearestNeighbors[i].distance = INFINITY;
         nearestNeighbors[i].index = -1;
@@ -29,11 +28,8 @@ void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, i
     // Process blocks of Q
     int blockSize = n / numBlocks;
     for (int blockStart = 0; blockStart < n; blockStart += blockSize) {
-
-        // Allocate memory for D block
         double *D = (double *)malloc(m * blockSize * sizeof(double));
 
-        // Compute the distances
         computeDistances(C, Q + blockStart * d, D, m, blockSize, d);
 
         // Find the k nearest neighbors for each point in the current block of Q
@@ -53,8 +49,6 @@ void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, i
             }
             free(neighbors);
         }
-
-        // Free allocated memory for D block
         free(D);
     }
 
@@ -65,8 +59,6 @@ void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, i
             idx[i * k + j] = nearestNeighbors[i * k + j].index;
         }
     }
-
-    // Free allocated memory
     free(nearestNeighbors);
 }
 
@@ -75,7 +67,7 @@ int main(int argc, char *argv[]) {
     int m = 1000; // Number of points in C
     int d = 2;
     int k = 3; // Number of nearest neighbors
-    int numBlocks = 10; // Number of blocks to split the points
+    int numBlocks = 10;
 
     // Initialize Q
     double *Q = (double *)malloc(n * d * sizeof(double));
@@ -92,12 +84,9 @@ int main(int argc, char *argv[]) {
             C[i * d + j] = i + j;
         }
     }
-
-    // Allocate memory for distances and indices
     double *dist = (double *)malloc(n * k * sizeof(double));
     int *idx = (int *)malloc(n * k * sizeof(int));
 
-    // Call kNNsearch
     kNNsearch(C, Q, m, n, d, k, dist, idx, numBlocks);
 
     // Print the nearest neighbors
@@ -109,8 +98,6 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
     }
-
-    // Free allocated memory
     free(Q);
     free(C);
     free(dist);
@@ -120,10 +107,7 @@ int main(int argc, char *argv[]) {
 }
 
 void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
-    // Allocate memory for C_squared
     double *C_squared = (double *)malloc(m * sizeof(double));
-
-    // Allocate memory for Q_squared
     double *Q_squared = (double *)malloc(n * sizeof(double));
 
     // Calculate C_squared
@@ -141,11 +125,8 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
             Q_squared[i] += Q[i * d + j] * Q[i * d + j];
         }
     }
-
-    // Allocate memory for CQ
     double *CQ = (double *)malloc(m * n * sizeof(double));
 
-    // Compute the -2*C*Q_T product using cblas_dgemm
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
 
     // Calculate the distances
@@ -154,8 +135,6 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
             D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);
         }
     }
-
-    // Free allocated memory
     free(C_squared);
     free(Q_squared);
     free(CQ);
