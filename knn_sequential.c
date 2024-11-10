@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <cblas.h>
 #include <math.h>
+#include "knn.h"
 
 typedef struct {
     double distance;
@@ -15,12 +16,66 @@ void quickSelect(Neighbor *arr, int left, int right, int k);
 int partition(Neighbor *arr, int left, int right);
 void swap(Neighbor *arr, int i, int j);
 
+void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, int *idx, int numBlocks) {
+    // Allocate memory for distances and indices
+    Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
+
+    // Initialize nearestNeighbors with large distances
+    for (int i = 0; i < n * k; i++) {
+        nearestNeighbors[i].distance = INFINITY;
+        nearestNeighbors[i].index = -1;
+    }
+
+    // Process blocks of Q
+    int blockSize = n / numBlocks;
+    for (int blockStart = 0; blockStart < n; blockStart += blockSize) {
+
+        // Allocate memory for D block
+        double *D = (double *)malloc(m * blockSize * sizeof(double));
+
+        // Compute the distances
+        computeDistances(C, Q + blockStart * d, D, m, blockSize, d);
+
+        // Find the k nearest neighbors for each point in the current block of Q
+        for (int i = 0; i < blockSize; i++) {
+            Neighbor *neighbors = (Neighbor *)malloc(m * sizeof(Neighbor));
+            for (int j = 0; j < m; j++) {
+                neighbors[j].distance = D[j * blockSize + i];
+                neighbors[j].index = j;
+            }
+
+            quickSelect(neighbors, 0, m - 1, k);
+
+            for (int j = 0; j < k; j++) {
+                if (neighbors[j].distance < nearestNeighbors[(blockStart + i) * k + j].distance) {
+                    nearestNeighbors[(blockStart + i) * k + j] = neighbors[j];
+                }
+            }
+            free(neighbors);
+        }
+
+        // Free allocated memory for D block
+        free(D);
+    }
+
+    // Copy results to dist and idx
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < k; j++) {
+            dist[i * k + j] = nearestNeighbors[i * k + j].distance;
+            idx[i * k + j] = nearestNeighbors[i * k + j].index;
+        }
+    }
+
+    // Free allocated memory
+    free(nearestNeighbors);
+}
+
 int main(int argc, char *argv[]) {
     int n = 1000; // Number of points in Q
     int m = 1000; // Number of points in C
     int d = 2;
     int k = 3; // Number of nearest neighbors
-    int blockSize = 100; // Size of each block
+    int numBlocks = 10; // Number of blocks to split the points
 
     // Initialize Q
     double *Q = (double *)malloc(n * d * sizeof(double));
@@ -30,80 +85,36 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Print Q
-    printf("\nQ matrix:\n");
-    printMatrix(Q, n, d);
-
-    // Allocate memory for nearest neighbors
-    Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
-
-    // Initialize nearestNeighbors with large distances
-    for (int i = 0; i < n * k; i++) {
-        nearestNeighbors[i].distance = INFINITY;
-        nearestNeighbors[i].index = -1;
+    // Initialize C
+    double *C = (double *)malloc(m * d * sizeof(double));
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < d; j++) {
+            C[i * d + j] = i + j;
+        }
     }
 
-    // Process blocks of C
-    for (int blockStart = 0; blockStart < m; blockStart += blockSize) {
-        int currentBlockSize = (blockStart + blockSize > m) ? (m - blockStart) : blockSize;
+    // Allocate memory for distances and indices
+    double *dist = (double *)malloc(n * k * sizeof(double));
+    int *idx = (int *)malloc(n * k * sizeof(int));
 
-        // Initialize C block
-        double *C = (double *)malloc(currentBlockSize * d * sizeof(double));
-        for (int i = 0; i < currentBlockSize; i++) {
-            for (int j = 0; j < d; j++) {
-                C[i * d + j] = (blockStart + i) + j;
-            }
-        }
-
-        // Print C block
-        printf("\nC block matrix:\n");
-        printMatrix(C, currentBlockSize, d);
-
-        // Allocate memory for D block
-        double *D = (double *)malloc(currentBlockSize * n * sizeof(double));
-
-        // Compute the distances
-        computeDistances(C, Q, D, currentBlockSize, n, d);
-
-        // Print the distances
-        printf("\nD block matrix:\n");
-        printMatrix(D, currentBlockSize, n);
-
-        // Find the k nearest neighbors for each point in Q
-        for (int i = 0; i < n; i++) {
-            Neighbor *neighbors = (Neighbor *)malloc(currentBlockSize * sizeof(Neighbor));
-            for (int j = 0; j < currentBlockSize; j++) {
-                neighbors[j].distance = D[j * n + i];
-                neighbors[j].index = blockStart + j;
-            }
-
-            quickSelect(neighbors, 0, currentBlockSize - 1, k);
-
-            for (int j = 0; j < k; j++) {
-                if (neighbors[j].distance < nearestNeighbors[i * k + j].distance) {
-                    nearestNeighbors[i * k + j] = neighbors[j];
-                }
-            }
-            free(neighbors);
-        }
-
-        // Free allocated memory for C block and D block
-        free(C);
-        free(D);
-    }
+    // Call kNNsearch
+    kNNsearch(C, Q, m, n, d, k, dist, idx, numBlocks);
 
     // Print the nearest neighbors
     printf("\nNearest neighbors matrix:\n");
     for (int i = 0; i < n; i++) {
+        printf("Point %d: ", i);
         for (int j = 0; j < k; j++) {
-            printf("(%d, %.2f) ", nearestNeighbors[i * k + j].index, nearestNeighbors[i * k + j].distance);
+            printf("(%d, %.2f) ", idx[i * k + j], dist[i * k + j]);
         }
         printf("\n");
     }
 
     // Free allocated memory
     free(Q);
-    free(nearestNeighbors);
+    free(C);
+    free(dist);
+    free(idx);
 
     return 0;
 }
