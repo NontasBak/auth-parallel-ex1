@@ -12,3 +12,12 @@ Written by Epaminontas Bakoulas and Maria Sotiria Kostomanolaki on November 2024
 PC specs: i5-11400F (6 cores, 12 threads), 16GB RAM, Linux Mint
 
 Test data: SIFT-128-euclidean
+
+### How it works
+1. Split the data points in *blocks* (ex. 100 blocks, with 10k points each if we have 1M points)
+2. *Within* each block, calculate the distances between the points and find the k-NN
+3. Find new neighbors by taking a *subset* of the points from 2 blocks (ex. 50%), calculate the new distances and update the k-NN if necessary
+4. Do this for all block pairs
+
+> [!NOTE]
+> In step 1 the points in each block are chosen **randomly** and not sequential. In step 3 the points in each subset are chosen **randomly**.
