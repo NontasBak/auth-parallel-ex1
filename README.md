@@ -10,4 +10,5 @@ Written by Epaminontas Bakoulas and Maria Sotiria Kostomanolaki on November 2024
 | Queries/second | 938          | 11995        | 905        | 12064      |
 
 PC specs: i5-11400F (6 cores, 12 threads), 16GB RAM, Linux Mint
+
 Test data: SIFT-128-euclidean
