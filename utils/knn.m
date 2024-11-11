@@ -2,7 +2,7 @@ clc, clearvars, close all;
 
 % Load train_data.mat
 load('../data/train_data.mat', 'train_data');
-load('../data/neighbors_data.mat', 'neighbors_data');
+% load('../data/neighbors_data.mat', 'neighbors_data');
 
 % Parameters
 n = 10000; % First 10k queries
