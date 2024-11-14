@@ -1,8 +1,9 @@
 CC = gcc
 CFLAGS = -I. -Wall -O3
+OPENCILK_COMPILER = /home/nontas/OpenCilk/bin/clang
 
 # Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
-all: knn_sequential knn_openmp knn_pthreads
+all: knn_sequential knn_openmp knn_pthreads knn_opencilk
 
 knn_sequential.o: src/knn_sequential.c src/knn.h
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -22,16 +23,16 @@ knn_openmp.o: src/knn_openmp.c src/knn.h
 knn_openmp: knn_openmp.o mat_loader.o
 	$(CC) $(CFLAGS) -fopenmp -o $@ $^ -lopenblas -lm -lmatio
 
-# knn_opencilk.o: src/knn_opencilk.c src/knn.h
-# 	$(CC) $(CFLAGS) -fcilkplus -o $@ -c $<
+knn_opencilk.o: src/knn_opencilk.c src/knn.h
+	$(OPENCILK_COMPILER) $(CFLAGS) -fopencilk -o $@ -c $<
 
-# knn_opencilk: knn_opencilk.o
-# 	$(CC) $(CFLAGS) -fcilkplus -o $@ $^
+knn_opencilk: knn_opencilk.o mat_loader.o
+	$(OPENCILK_COMPILER) $(CFLAGS) -fopencilk -o $@ $^ -lopenblas -lm -lmatio
 
 mat_loader.o: utils/mat_loader.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 # Add knn_pthreads knn_openmp knn_opencilk here when they're implemented
 clean:
-	rm -f *.o knn_sequential knn_openmp knn_pthreads
+	rm -f *.o knn_sequential knn_openmp knn_pthreads knn_opencilk
 

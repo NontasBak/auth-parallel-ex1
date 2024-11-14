@@ -3,11 +3,11 @@
 
 Written by Epaminontas Bakoulas and Maria Sotiria Kostomanolaki on November 2024
 
-|                | Pthreads (1) | Pthreads (2) | OpenMP (1) | OpenMP (2) |
-|----------------|--------------|--------------|------------|------------|
-| Threads        | 4            | 4            | 4          | 4          |
-| Recall         | 25.34%       | 2.22%        | 26.52%     | 2.24%      |
-| Queries/second | 938          | 11995        | 905        | 12064      |
+|                | Pthreads (1) | Pthreads (2) | OpenMP (1) | OpenMP (2) | OpenCilk (1) | OpenCilk (2) |
+|----------------|--------------|--------------|------------|------------|--------------|--------------|
+| Threads        | 4            | 4            | 4          | 4          | 4            | 4            |
+| Recall         | 25.34%       | 2.22%        | 26.52%     | 2.24%      | 26.54%       | 2.24%        |
+| Queries/second | 938          | 11995        | 905        | 12064      | 915          | 11846        |
 
 PC specs: i5-11400F (6 cores, 12 threads), 16GB RAM, Linux Mint
 
