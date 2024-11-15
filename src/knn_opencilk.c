@@ -14,15 +14,150 @@ typedef struct {
     int index;
 } Neighbor;
 
-void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d);
-void printMatrix(const double *A, int m, int n);
-void printMatrixInt(const int *A, int m, int n);
-void quickSelect(Neighbor *arr, int left, int right, int k);
-int partition(Neighbor *arr, int left, int right);
-void swap(Neighbor *arr, int i, int j);
-void selectRandomPoints(int *indices, int blockSize, int sampleSize);
-void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, int globalIndex, int k);
-void shuffleIndices(int *indices, int size);
+void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
+    double *C_squared = (double *)malloc(m * sizeof(double));
+    double *Q_squared = (double *)malloc(n * sizeof(double));
+
+    // Calculate C_squared
+    cilk_for (int i = 0; i < m; i++) {
+        C_squared[i] = 0;
+        for (int j = 0; j < d; j++) {
+            C_squared[i] += C[i * d + j] * C[i * d + j];
+        }
+    }
+
+    // Calculate Q_squared
+    cilk_for (int i = 0; i < n; i++) {
+        Q_squared[i] = 0;
+        for (int j = 0; j < d; j++) {
+            Q_squared[i] += Q[i * d + j] * Q[i * d + j];
+        }
+    }
+
+    double *CQ = (double *)malloc(m * n * sizeof(double));
+
+    // Compute the -2*C*Q_T product using openblas
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
+
+    // Calculate the distances
+    cilk_for (int i = 0; i < m; i++) {
+        cilk_for (int j = 0; j < n; j++) {
+            D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);
+        }
+    }
+
+    // Free allocated memory
+    free(C_squared);
+    free(Q_squared);
+    free(CQ);
+}
+
+void swap(Neighbor *arr, int i, int j) {
+    Neighbor temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+}
+
+int partition(Neighbor *arr, int left, int right) {
+    double pivot = arr[right].distance;
+    int pivotIndex = left;
+    for (int i = left; i < right; i++) {
+        if (arr[i].distance < pivot) {
+            swap(arr, i, pivotIndex);
+            pivotIndex++;
+        }
+    }
+    swap(arr, right, pivotIndex);
+    return pivotIndex;
+}
+
+void quickSelect(Neighbor *arr, int left, int right, int k) {
+    if (left == right) return;
+
+    int pivotIndex = partition(arr, left, right);
+
+    if (k == pivotIndex) {
+        return;
+    } else if (k < pivotIndex) {
+        quickSelect(arr, left, pivotIndex - 1, k);
+    } else {
+        quickSelect(arr, pivotIndex + 1, right, k);
+    }
+}
+
+void selectRandomPoints(int *indices, int blockSize, int sampleSize) {
+    for (int i = 0; i < blockSize; i++) indices[i] = i;
+    for (int i = 0; i < sampleSize; i++) {
+        int randIndex = i + rand() % (blockSize - i);
+        int temp = indices[i];
+        indices[i] = indices[randIndex];
+        indices[randIndex] = temp;
+    }
+}
+
+void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, int globalIndex, int k) {
+    for (int j = 0; j < k; j++) {
+        // Find the position to insert the new neighbor
+        int maxIndex = -1;
+        double maxDistance = -1.0;
+        for (int l = 0; l < k; l++) {
+            if (nearestNeighbors[globalIndex * k + l].distance > maxDistance) {
+                maxDistance = nearestNeighbors[globalIndex * k + l].distance;
+                maxIndex = l;
+            }
+        }
+        // If the new neighbor is closer, replace the farthest neighbor
+        if (neighbors[j].distance < maxDistance) {
+            nearestNeighbors[globalIndex * k + maxIndex] = neighbors[j];
+        }
+    }
+}
+
+void shuffleIndices(int *indices, int size) {
+    for (int i = 0; i < size; i++) {
+        int randIndex = i + rand() % (size - i);
+        int temp = indices[i];
+        indices[i] = indices[randIndex];
+        indices[randIndex] = temp;
+    }
+}
+
+void processBlockDistances(const double *D, int *shuffledIndices, int blockSize, int block, int k, Neighbor *nearestNeighbors) {
+    cilk_for (int i = 0; i < blockSize; i++) {
+        Neighbor *neighbors = (Neighbor *)malloc(blockSize * sizeof(Neighbor));
+        int globalIndex = shuffledIndices[block * blockSize + i];
+        for (int j = 0; j < blockSize; j++) {
+            neighbors[j].distance = D[i * blockSize + j];
+            neighbors[j].index = shuffledIndices[block * blockSize + j];
+        }
+
+        quickSelect(neighbors, 0, blockSize - 1, k);
+        updateKNearestNeighbors(neighbors, nearestNeighbors, globalIndex, k);
+        free(neighbors);
+    }
+}
+
+void processBlockPairDistances(const double *D, int *shuffledIndices, int blockSize, int sampleSize, int block1, int block2, int k, Neighbor *nearestNeighbors, int *indices1, int *indices2) {
+    cilk_for (int i = 0; i < sampleSize; i++) {
+        Neighbor *neighbors1 = (Neighbor *)malloc(sampleSize * sizeof(Neighbor));
+        Neighbor *neighbors2 = (Neighbor *)malloc(sampleSize * sizeof(Neighbor));
+        int globalIndex1 = shuffledIndices[block1 * blockSize + indices1[i]];
+        int globalIndex2 = shuffledIndices[block2 * blockSize + indices2[i]];
+        for (int j = 0; j < sampleSize; j++) {
+            neighbors1[j].distance = D[i * sampleSize + j];
+            neighbors1[j].index = shuffledIndices[block2 * blockSize + indices2[j]];
+            neighbors2[j].distance = D[j * sampleSize + i];
+            neighbors2[j].index = shuffledIndices[block1 * blockSize + indices1[j]];
+        }
+
+        quickSelect(neighbors1, 0, sampleSize - 1, k);
+        updateKNearestNeighbors(neighbors1, nearestNeighbors, globalIndex1, k);
+        quickSelect(neighbors2, 0, sampleSize - 1, k);
+        updateKNearestNeighbors(neighbors2, nearestNeighbors, globalIndex2, k);
+        free(neighbors1);
+        free(neighbors2);
+    }
+}
 
 void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, float subBlockRatio) {
     srand(time(NULL));
@@ -56,19 +191,8 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
         computeDistances(C_block, C_block, D, blockSize, blockSize, d);
         printf("Computed distances for block %d\n", block);
 
-        // Find the k nearest neighbors for each point in the block
-        cilk_for (int i = 0; i < blockSize; i++) {
-            Neighbor *neighbors = (Neighbor *)malloc(blockSize * sizeof(Neighbor));
-            for (int j = 0; j < blockSize; j++) {
-                neighbors[j].distance = D[i * blockSize + j];
-                neighbors[j].index = shuffledIndices[block * blockSize + j];
-            }
+        processBlockDistances(D, shuffledIndices, blockSize, block, k, nearestNeighbors);
 
-            quickSelect(neighbors, 0, blockSize - 1, k);
-
-            updateKNearestNeighbors(neighbors, nearestNeighbors, shuffledIndices[block * blockSize + i], k);
-            free(neighbors);
-        }
         free(D);
         free(C_block);
     }
@@ -102,33 +226,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
 
             printf("Computed distances for blocks (%d, %d)\n", block1, block2);
 
-            // Find the k nearest neighbors for each point in the sample of block1
-            cilk_for (int i = 0; i < sampleSize; i++) {
-                Neighbor *neighbors = (Neighbor *)malloc(sampleSize * sizeof(Neighbor));
-                for (int j = 0; j < sampleSize; j++) {
-                    neighbors[j].distance = D[i * sampleSize + j];
-                    neighbors[j].index = shuffledIndices[block2 * blockSize + indices2[j]];
-                }
-
-                quickSelect(neighbors, 0, sampleSize - 1, k);
-
-                updateKNearestNeighbors(neighbors, nearestNeighbors, shuffledIndices[block1 * blockSize + indices1[i]], k);
-                free(neighbors);
-            }
-
-            // Find the k nearest neighbors for each point in the sample of block2
-            cilk_for (int i = 0; i < sampleSize; i++) {
-                Neighbor *neighbors = (Neighbor *)malloc(sampleSize * sizeof(Neighbor));
-                for (int j = 0; j < sampleSize; j++) {
-                    neighbors[j].distance = D[j * sampleSize + i];
-                    neighbors[j].index = shuffledIndices[block1 * blockSize + indices1[j]];
-                }
-
-                quickSelect(neighbors, 0, sampleSize - 1, k);
-
-                updateKNearestNeighbors(neighbors, nearestNeighbors, shuffledIndices[block2 * blockSize + indices2[i]], k);
-                free(neighbors);
-            }
+            processBlockPairDistances(D, shuffledIndices, blockSize, sampleSize, block1, block2, k, nearestNeighbors, indices1, indices2);
 
             free(D);
             free(C_block1);
@@ -157,7 +255,6 @@ int main(int argc, char *argv[]) {
     int k = 100; // Number of nearest neighbors
     int numBlocks = 100;
     float subBlockRatio = 0.05;
-    int numThreads = 4;
 
     double *C = (double *)malloc(m * d * sizeof(double));
     double *dist = (double *)malloc(n * k * sizeof(double));
@@ -202,131 +299,4 @@ int main(int argc, char *argv[]) {
     free(groundTruth);
 
     return 0;
-}
-
-void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
-    double *C_squared = (double *)malloc(m * sizeof(double));
-    double *Q_squared = (double *)malloc(n * sizeof(double));
-
-    // Calculate C_squared
-    cilk_for (int i = 0; i < m; i++) {
-        C_squared[i] = 0;
-        for (int j = 0; j < d; j++) {
-            C_squared[i] += C[i * d + j] * C[i * d + j];
-        }
-    }
-
-    // Calculate Q_squared
-    cilk_for (int i = 0; i < n; i++) {
-        Q_squared[i] = 0;
-        for (int j = 0; j < d; j++) {
-            Q_squared[i] += Q[i * d + j] * Q[i * d + j];
-        }
-    }
-
-    // Allocate memory for CQ
-    double *CQ = (double *)malloc(m * n * sizeof(double));
-
-    // Compute the -2*C*Q_T product using cblas_dgemm
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);
-
-    // Calculate the distances
-    cilk_for (int i = 0; i < m; i++) {
-        cilk_for (int j = 0; j < n; j++) {
-            D[i * n + j] = sqrt(C_squared[i] + Q_squared[j] + CQ[i * n + j]);
-        }
-    }
-
-    // Free allocated memory
-    free(C_squared);
-    free(Q_squared);
-    free(CQ);
-}
-
-void printMatrix(const double *A, int m, int n) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%.2f ", A[i * n + j]);
-        }
-        printf("\n");
-    }
-}
-
-void printMatrixInt(const int *A, int m, int n) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%d ", A[i * n + j]);
-        }
-        printf("\n");
-    }
-}
-
-void quickSelect(Neighbor *arr, int left, int right, int k) {
-    if (left == right) return;
-
-    int pivotIndex = partition(arr, left, right);
-
-    if (k == pivotIndex) {
-        return;
-    } else if (k < pivotIndex) {
-        quickSelect(arr, left, pivotIndex - 1, k);
-    } else {
-        quickSelect(arr, pivotIndex + 1, right, k);
-    }
-}
-
-int partition(Neighbor *arr, int left, int right) {
-    double pivot = arr[right].distance;
-    int pivotIndex = left;
-    for (int i = left; i < right; i++) {
-        if (arr[i].distance < pivot) {
-            swap(arr, i, pivotIndex);
-            pivotIndex++;
-        }
-    }
-    swap(arr, right, pivotIndex);
-    return pivotIndex;
-}
-
-void swap(Neighbor *arr, int i, int j) {
-    Neighbor temp = arr[i];
-    arr[i] = arr[j];
-    arr[j] = temp;
-}
-
-void selectRandomPoints(int *indices, int blockSize, int sampleSize) {
-    for (int i = 0; i < blockSize; i++) indices[i] = i;
-    for (int i = 0; i < sampleSize; i++) {
-        int randIndex = i + rand() % (blockSize - i);
-        int temp = indices[i];
-        indices[i] = indices[randIndex];
-        indices[randIndex] = temp;
-    }
-}
-
-void updateKNearestNeighbors(Neighbor *neighbors, Neighbor *nearestNeighbors, int globalIndex, int k) {
-    for (int j = 0; j < k; j++) {
-        // Find the position to insert the new neighbor
-        int maxIndex = -1;
-        double maxDistance = -1.0;
-        for (int l = 0; l < k; l++) {
-            if (nearestNeighbors[globalIndex * k + l].distance > maxDistance) {
-                maxDistance = nearestNeighbors[globalIndex * k + l].distance;
-                maxIndex = l;
-            }
-        }
-        // If the new neighbor is closer, replace the farthest neighbor
-        if (neighbors[j].distance < maxDistance) {
-            nearestNeighbors[globalIndex * k + maxIndex] = neighbors[j];
-        }
-    }
-}
-
-void shuffleIndices(int *indices, int size) {
-    for (int i = 0; i < size; i++) {
-        int randIndex = i + rand() % (size - i);
-        int temp = indices[i];
-        indices[i] = indices[randIndex];
-        indices[randIndex] = temp;
-    }
 }
