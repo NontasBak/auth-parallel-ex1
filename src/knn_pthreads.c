@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
     int d = 128;
     int k = 100; // Number of nearest neighbors
     int numBlocks = 100;
-    float subBlockRatio = 0.05;
+    float subBlockRatio = 0.5;
 
     // Set the environment variable for OpenBLAS
     setenv("OPENBLAS_NUM_THREADS", "4", 1);
@@ -355,10 +355,10 @@ int main(int argc, char *argv[]) {
         }
     }
     int totalNeighbors = numTestQueries * k;
-    double recall0 = (double)correctNeighbors / totalNeighbors * 100.0;
+    double recall = (double)correctNeighbors / totalNeighbors * 100.0;
     double queriesPerSecond = n / elapsedTime;
 
-    printf("\nRecall: %.4f%%\n", recall0);
+    printf("\nRecall: %.4f%%\n", recall);
     printf("Queries per second: %.2f\n", queriesPerSecond);
 
     free(C);
