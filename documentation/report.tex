@@ -6,6 +6,7 @@
 \pgfplotsset{compat=1.17}
 \usepackage{afterpage}
 \usepackage{float}
+\usepackage{hyperref}
 
 \title{k-Nearest Neighbors (k-NN) Implementation in Parallel}
 \author{Epameinondas Bakoulas and Maria Sotiria Kostomanolaki}
@@ -18,7 +19,8 @@
 \begin{abstract}
     This document explains the implementation of the \textbf{k-Nearest Neighbors (kNN)} algorithm in C, both in serial and parallel execution.
     The focus will mainly be on the parallel execution using threads to improve the speed of the execution, assuming that $C=Q$, the
-    number of points in the dataset is in the millions and the number of dimensions is in the hundreds.
+    number of points in the dataset is in the millions and the number of dimensions is in the hundreds. It will also display how
+    we can efficiently manage the memory usage, by splitting the data into blocks.
 \end{abstract}
 
 \section{Distance calculation}
@@ -32,10 +34,16 @@ $C.^2$ and $Q.^2$ denote element-wise squaring of the matrices and summing along
 The function that implements the above is called \texttt{computeDistances}.
 
 \section{Sequential implementation}
-The \texttt{kNNsearch} function finds the k-nearest neighbors for each point in the matrix $Q$.
+The \texttt{kNNsearch} function finds the k-nearest neighbors in the matrix $C$ for each point in the matrix $Q$.
 First, it splits the $Q$ matrix into \emph{blocks} in order minimize memory usage.
-Then, it calculates the distances between the points in each block and the points in the corpus matrix $C$.
-Finally, it finds the k-nearest neighbors and their distances for each point in the block.
+Then, it calculates the distances between the points in each block $(Q1, Q2, \dots)$ and the points in the corpus matrix $C$.
+Finally, it finds the k-nearest neighbors and their distances using the function \texttt{quickSelect}.
+
+Our implementation aims to replicate the results of Matlab's \texttt{knnsearch} function, which is used to find the k-nearest neighbors.
+Thus, it will return 2 arrays \texttt{idx} and \texttt{dist}, where \texttt{idx} contains the indices of the nearest neighbors
+and \texttt{dist} contains the distances to the nearest neighbors.
+Since Matlab displays the nearest neighbors sorted, we also modified the \texttt{quickSelect} function to sort the k-nearest 
+neighbors by distance.
 
 \section{Parallel implementation}
 We will assume $C=Q$ from now on and we will aim to find an \emph{approximate} solution for the k-nearest neighbors problem
@@ -48,11 +56,11 @@ The function \texttt{kNN} initializes an $n \times k$ array \texttt{nearestNeigh
 Each element in this array is initialized with a distance of \emph{INFINITY} and an index of $-1$.
 
 \subsection{Splitting data into blocks}
-The data points are divided into \emph{blocks} randomly. The randomess is achieved with the helper 
-function \texttt{shuffleIndices} that takes an array of indices and shuffles them randomly. The first $n / numBlocks$ 
+Controlling memory usage is crucial, so we split the data randomly into \emph{blocks}. The randomess is achieved with the helper 
+function \texttt{shuffleIndices} that takes an array of indices and shuffles them randomly. The first $n / numBlocks$ shuffled
 points are assigned to the first block, the next $n / numBlocks$ points to the second block, and so on.
 
-For example, consider the matrix 
+For example, consider the matrix C ($n \times d$):
 \[
 C = \begin{bmatrix}
 0 & 1 \\
@@ -108,7 +116,7 @@ Finding the k-Nearest Neighbors is achieved with the function \texttt{quickSelec
 the neighbors of a point (an array of \texttt{Neighbor}s) and quick selects the distances to find the $k$ nearest neighbors.
 The blocks are processed in parallel. Each thread processes a block, until all blocks are processed.
 
-After processing blocks, the nearestNeighbors matrix (NN) will look like (only first 4 points are shown, $k=3$):
+After processing all of the blocks, the nearestNeighbors matrix (NN) will look like this (only first 4 points are shown, $k=3$):
 \[
 \text{NN} = \begin{bmatrix}
 (0, 0.0) & (5, 7.07) & (10, 14.14) \\
@@ -119,7 +127,7 @@ After processing blocks, the nearestNeighbors matrix (NN) will look like (only f
 \]
 
 \subsection{Improving the Solution}
-The solution is improved by finding distances between points in different blocks using a subset of the points. 
+The solution is improved by finding distances between points in different blocks using a \emph{subset} of the points. 
 For example, if we combine pairs of blocks by choosing only $50\%$ of the points in random (2 points from each block),
 we might get:
 \[
@@ -133,10 +141,13 @@ we might get:
 \end{bmatrix}
 \]
 We'll calculate the distance matrix using these points to update their neighbors. In the above example, we will find the
-distance between the points $[0, 1]$, $[2, 3]$, $[10, 11]$ and $[14, 15]$ and update their nearest neighbors if we end up finding a new
+distances between the points $[0, 1]$, $[2, 3]$, $[10, 11]$ and $[14, 15]$ (excluding the distances between the points in the same block) and update their nearest neighbors if we end up finding a new
 nearest neighbor.
 
-After this improvement, the nearestNeighbors matrix (NN) will look like:
+Updating the nearest neighbors is achieved with the function \texttt{updateKNearestNeighbors}. It finds the (current) nearest neighbor with
+the biggest distance, and tries to replace it with the new neighbor. If the new neighbor is closer, it replaces the current one.
+
+After this improvement, the nearestNeighbors matrix (NN) will look like this:
 \[
 \text{NN} = \begin{bmatrix}
 (0, 0.0) & (5, 7.07) & (2, 2.83) \\
@@ -163,7 +174,7 @@ Queries per second is the number of queries that the algorithm processes in one 
 
 
 \section{Benchmarks}
-We will display the benchmarks produced from testing the data \emph{sift-128-euclidean}.
+We will display the benchmarks produced from testing the dataset \emph{SIFT-128-euclidean}.
 It has a total of $n=1,000,000$ points and $d=128$ dimensions, and we'll find the $k=100$ nearest neighbors.
 Tested on a computer with CPU: i5-11400F (6 cores, 12 threads), 16GB RAM, and OS: Linux Mint 22.
 The following graph summarizes the benchmarks for different implementations:
@@ -172,7 +183,7 @@ The following graph summarizes the benchmarks for different implementations:
 \centering
 \begin{tikzpicture}
     \begin{axis}[
-        title={Recall-Queries per second tradeoff - up and to the right is better},
+        title={SIFT-128-euclidean: Recall-Queries per second tradeoff - up and to the right is better},
         xlabel={Recall (\%)},
         ylabel={Queries per second},
         legend pos=north east,
@@ -223,12 +234,12 @@ The following graph summarizes the benchmarks for different implementations:
 
 \end{axis}
 \end{tikzpicture}
-\caption{Queries per second vs Recall for different implementations (4 threads)}
+\caption{Queries per second vs Recall for different implementations (4 threads, 100 blocks)}
 \end{figure}
 
 All 3 parallel implementations produce very similar results. 
 We can clearly see that the parallel implementations are much faster than the sequential one
-by a factor of $\times2.8-3.4$ using 4 threads.
+by a factor of \textbf{x2.8 - 3.4} using 4 threads.
 
 To measure the recall we used only the first 10000 points of the dataset and we did not take into account
 the position of the neighbors in the \texttt{nearestNeighbors} array. We only checked if the neighbors were the same
@@ -238,11 +249,31 @@ by the fact that we introduced randomness in the algorithm, and also because n i
 What if we wanted to maximize the \emph{Recall} for this dataset using the same algorithm?
 We tested it with OpenMP and the end results were Recall = $99.98\%$ and Queries per second = $241$.
 This result beats the last sequential result (Recall = $57.21\%$, Queries per second = $135$) by a factor of $\times1.7$, 
-both in Recall and Queries per second!
+both in Recall and Queries per second.
 
-Can we do better? Yes we can, by increasing the number of threads. We tested the same dataset with 8 threads and the
+We can achieve even better performance by increasing the number of threads. Testing the same dataset with 8 threads and the
 results were slightly better, by a factor of $\times1.1-1.2$ in Queries per second. This is expected due to hardware
-bottlenecks, but it does allow us to fully utilize the CPU.
+bottlenecks, but it does allow us to fully utilize the CPU and boost performance.
+
+Comparing the benchmark results with \texttt{ann-benchmarks} for the same dataset, 
+we can see that our algorithm
+is pretty competitive, taking into account that their tests were run on 31 threads. 
+As it stands it only manages to beat \texttt{pg-vector}.
+
+\section{Algorithm correctness}
+The algorithm does produce correct results without bias, since there's randomness involved throughout the process.
+Block splitting is completely random, and picking points to create sub blocks is also random. In the case of large datasets, rerunning the
+algorithm with the same parameters will produce very similar \emph{Recall} results with a very small deviation.
+
+Data races may occur since \texttt{nearestNeighbors} is a global variable shared between the threads, but the error they might produce 
+is marginal, compared to the overall result. The algorithm was tested with locks implemented to avoid data races, but it came at 
+a high cost of speed. Thus, in this case, the speed of the algorithm takes a higher precedence.
+
+\section{Conclusion}
+You can find the source code of the implementation on Github: 
+\href{https://github.com/NontasBak/auth-parallel-ex1}{Go to repository}
+
+Detailed instructions on how to run the code and the results of the benchmarks can be found in the repository's README file.
 
 
 \end{document}
