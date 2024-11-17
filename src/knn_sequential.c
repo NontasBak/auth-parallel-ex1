@@ -4,11 +4,6 @@
 #include <math.h>
 #include "knn.h"
 
-typedef struct {
-    double distance;
-    int index;
-} Neighbor;
-
 void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
     double *C_squared = (double *)malloc(m * sizeof(double));
     double *Q_squared = (double *)malloc(n * sizeof(double));
@@ -28,7 +23,7 @@ void computeDistances(const double *C, const double *Q, double *D, int m, int n,
             Q_squared[i] += Q[i * d + j] * Q[i * d + j];
         }
     }
-    
+
     double *CQ = (double *)malloc(m * n * sizeof(double));
 
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, d, -2.0, C, d, Q, d, 0.0, CQ, n);

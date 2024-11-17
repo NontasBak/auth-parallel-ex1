@@ -8,11 +8,6 @@
 #include "../utils/mat_loader.h"
 #include "knn.h"
 
-typedef struct {
-    double distance;
-    int index;
-} Neighbor;
-
 void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
     double *C_squared = (double *)malloc(m * sizeof(double));
     double *Q_squared = (double *)malloc(n * sizeof(double));

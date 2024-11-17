@@ -11,11 +11,6 @@
 #define NUM_THREADS 4
 
 typedef struct {
-    double distance;
-    int index;
-} Neighbor;
-
-typedef struct {
     double *C;
     double *dist;
     int *idx;
