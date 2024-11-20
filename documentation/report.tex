@@ -310,11 +310,22 @@ Data races may occur since \texttt{nearestNeighbors} is a global variable shared
 is marginal, compared to the overall result. The algorithm was tested with locks implemented to avoid data races, but it came at 
 a high cost of speed. Thus, in this case, the speed of the algorithm takes a higher precedence.
 
-\section{Conclusion}
-You can find the source code of the implementation on Github: 
-\href{https://github.com/NontasBak/auth-parallel-ex1}{Go to repository}
+\section{Summary}
+The parallel algorithm can be briefly summarized as:
+
+\begin{enumerate}
+    \item Split the data points in blocks (ex. 100 blocks, with 10k points each if we have 1M points).
+    \item Within each block, calculate the distances between the points and find the k-NN.
+    \item Find new neighbors by taking a subset of the points from 2 blocks (ex. 50\%), calculate the new distances and update the k-NN if necessary.
+    \item Repeat step 3 for all block pairs.
+\end{enumerate}
+
+Steps 1 and 3 do not split the points sequentially. Instead, they shuffle the indices of the points randomly.
+
+\section{Source code}
+You can find the source code of the implementation on the 
+\href{https://github.com/NontasBak/auth-parallel-ex1}{Github repository}. 
 
 Detailed instructions on how to run the code and the results of the benchmarks can be found in the repository's README file.
-
 
 \end{document}
