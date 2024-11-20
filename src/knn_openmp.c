@@ -8,6 +8,8 @@
 #include "../utils/mat_loader.h"
 #include "knn.h"
 
+#define NUM_THREADS 4
+
 void computeDistances(const double *C, const double *Q, double *D, int m, int n, int d) {
     double *C_squared = (double *)malloc(m * sizeof(double));
     double *Q_squared = (double *)malloc(n * sizeof(double));
@@ -174,7 +176,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
     for (int i = 0; i < n; i++) shuffledIndices[i] = i;
     shuffleIndices(shuffledIndices, n);
 
-    // Process blocks of C and Q
+    // Process blocks of C
     int blockSize = n / numBlocks;
     #pragma omp parallel for
     for (int block = 0; block < numBlocks; block++) {
@@ -256,13 +258,12 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
 int main(int argc, char *argv[]) {
     int n = 1000000; // Number of points in Q
     int m = 1000000; // Number of points in C
-    int d = 128;
+    int d = 128; // Number of dimensions
     int k = 100; // Number of nearest neighbors
     int numBlocks = 100;
-    float subBlockRatio = 0.5;
-    int numThreads = 4;
+    float subBlockRatio = 0.5; // Size of each sub block when comparing blocks with each other (0, 1]
 
-    omp_set_num_threads(numThreads);
+    omp_set_num_threads(NUM_THREADS);
 
     double *C = (double *)malloc(m * d * sizeof(double));
     double *dist = (double *)malloc(n * k * sizeof(double));

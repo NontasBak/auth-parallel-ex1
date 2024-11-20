@@ -170,7 +170,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
     for (int i = 0; i < n; i++) shuffledIndices[i] = i;
     shuffleIndices(shuffledIndices, n);
 
-    // Process blocks of C and Q
+    // Process blocks of C
     int blockSize = n / numBlocks;
     cilk_for (int block = 0; block < numBlocks; block++) {
         double *D = (double *)malloc(blockSize * blockSize * sizeof(double));
@@ -246,7 +246,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
 int main(int argc, char *argv[]) {
     int n = 1000000; // Number of points in Q
     int m = 1000000; // Number of points in C
-    int d = 128;
+    int d = 128; // Number of dimensions
     int k = 100; // Number of nearest neighbors
     int numBlocks = 100;
     float subBlockRatio = 0.5;
