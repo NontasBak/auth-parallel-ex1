@@ -50,7 +50,6 @@ distances between the points in the query and corpus datasets, which initialize 
     \item \texttt{Neighbor} struct: Represents a single neighbor of a data point. Contains an \texttt{index} and a \texttt{distance}.
     \item \texttt{nearestNeighbors} array: An $n \times k$ array of \texttt{Neighbor} structures that stores the k-nearest neighbors for each point in the query dataset. During initialization, 
     the values of \texttt{distance} and \texttt{index} are set to \emph{INFINITY} and $-1$ respectively.
-    \item \texttt{D} array: An $m \times n$ array that stores the distances between each pair of points in the query and corpus datasets.
 \end{itemize}
 
 \subsection{Algorithm}
@@ -88,13 +87,13 @@ To simplify our analysis, we will assume that $C==Q$. We will consider datasets 
 The implementation of the algorithm is done using the \texttt{Pthreads}, \texttt{OpenMP}, and \texttt{OpenCilk} libraries.
 
 \subsection{Data structures}
-The data structures used in the parallel implementation are similar to the sequential version, with the addition of a few key elements:
+The data structures used in the parallel implementation are similar to the sequential version, with the addition of a key element:
 \begin{itemize}
     \item \texttt{shuffledIndices} array: Contains the shuffled indices of the points in the dataset.
     
 \end{itemize}
 
-The initializations of the \texttt{nearestNeighbors} and \texttt{D} arrays are the same as in the sequential implementation.
+The initialization of the \texttt{nearestNeighbors} array is the same as in the sequential implementation.
 
 \subsection{Splitting data into blocks}
 Controlling memory usage is crucial, so we split the data randomly into \emph{blocks}. The randomess is achieved with the helper 
