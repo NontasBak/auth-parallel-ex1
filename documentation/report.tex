@@ -31,9 +31,15 @@ $C$ and $Q$ is calculated as:
 \[
 D = \sqrt{C.^2 - 2 C Q^T + (Q.^2)^T}
 \]
-where $C$ is the \textbf{corpus} dataset with $m$ points and $d$ dimensions, and $Q$ is the \textbf{query} dataset with $n$ points and $d$ dimensions.
-$C.^2$ and $Q.^2$ denote element-wise squaring of the matrices and summing along the columns.
-The function that implements the above is called \texttt{computeDistances}.
+where:
+\begin{itemize}
+    \item $C$ is the \textbf{corpus} dataset with $m$ points and $d$ dimensions
+    \item $Q$ is the \textbf{query} dataset with $n$ points and $d$ dimensions
+\end{itemize}
+and $C.^2$ and $Q.^2$ denote element-wise squaring of the matrices and summing along the columns.
+
+The function that implements the above is called \texttt{computeDistances} and it is called to calculate the
+distances between the points in the query and corpus datasets, which initialize the \texttt{D} array of size $m \times n$.
 
 
 \section{Sequential implementation}
@@ -44,7 +50,7 @@ The function that implements the above is called \texttt{computeDistances}.
     \item \texttt{Neighbor} struct: Represents a single neighbor of a data point. Contains an \texttt{index} and a \texttt{distance}.
     \item \texttt{nearestNeighbors} array: An $n \times k$ array of \texttt{Neighbor} structures that stores the k-nearest neighbors for each point in the query dataset. During initialization, 
     the values of \texttt{distance} and \texttt{index} are set to \emph{INFINITY} and $-1$ respectively.
-    \item \texttt{D} array: An $n \times m$ array that stores the distances between each pair of points in the query and corpus datasets.
+    \item \texttt{D} array: An $m \times n$ array that stores the distances between each pair of points in the query and corpus datasets.
 \end{itemize}
 
 \subsection{Algorithm}
@@ -61,7 +67,7 @@ To match the behavior of MATLAB's \texttt{knnsearch} function, the \texttt{quick
 Additionally, the output of the \texttt{kNNsearch function} is given as a pair of arrays:
 \begin{itemize}
     \item \texttt{idx} : Contains the indices of the k-nearest neighbors for each point in $Q$.
-    \item \texttt{dist}t : Contains the distances to the corresponding nearest neighbors.
+    \item \texttt{dist} : Contains the distances to the corresponding nearest neighbors.
 \end{itemize}
 
 By following this approach, our implementation aims to replicate the functionality and output format of MATLAB's \texttt{knnsearch} function.
@@ -78,6 +84,8 @@ To efficiently handle large-scale datasets, we adopt a parallel computing approa
 By employing \emph{approximation} techniques, we aim to achieve a balance between computational efficiency and solution quality.
 
 To simplify our analysis, we will assume that $C==Q$. We will consider datasets with millions of points and dimensions between 3 and 1000.
+
+The implementation of the algorithm is done using the \texttt{Pthreads}, \texttt{OpenMP}, and \texttt{OpenCilk} libraries.
 
 \subsection{Data structures}
 The data structures used in the parallel implementation are similar to the sequential version, with the addition of a few key elements:
@@ -144,12 +152,15 @@ one possible split into 4 blocks is:
 \]
 
 \subsection{Processing blocks}
-For each block, we calculate the distances between the points and update the nearest neighbors.
-Finding the k-Nearest Neighbors is achieved with the function \texttt{quickSelect}. It takes as input
-the neighbors of a point (an array of \texttt{Neighbor}s) and quick selects the distances to find the $k$ nearest neighbors.
-The blocks are processed in parallel. Each thread processes a block, until all blocks are processed.
+The \texttt{kNN} algorithm is implemented in a \textbf{block-wise} manner to improve efficiency. Each block of data
+points is processed independently in parallel.
 
-After processing all of the blocks, the nearestNeighbors matrix (NN) will look like this (only first 4 points are shown, $k=3$):
+For each block, pairwise distances between points are calculated using the \texttt{computeDistances} func-
+tion. To efficiently identify the k-Nearest Neighbors for a given point, the \texttt{quickSelect} function is called
+on an array of \texttt{Neighbor} structures, each containing a \texttt{distance} and an \texttt{index}. The k-Nearest Neighbors
+are then updated in the \texttt{nearestNeighbors} array.
+
+After processing all of the blocks, the \texttt{nearestNeighbors} matrix (NN) will look like this (only first 4 points are shown, $k=3$):
 \[
 \text{NN} = \begin{bmatrix}
 (0, 0.0) & (5, 7.07) & (10, 14.14) \\
@@ -173,9 +184,11 @@ we might get:
 14 & 15
 \end{bmatrix}
 \]
-We'll calculate the distance matrix using these points to update their neighbors. In the above example, we will find the
-distances between the points $[0, 1]$, $[2, 3]$, $[10, 11]$ and $[14, 15]$ (excluding the distances between the points in the same block) and update their nearest neighbors if we end up finding a new
-nearest neighbor.
+We will calculate the distance matrix using the points $[0, 1]$, $[2, 3]$, $[10, 11]$ and $[14, 15]$ to update their
+neighbors. For each point, we will find the distances to the points in the opposite sub-block. This can be
+achieved using the \texttt{computeDistances} function by passing the first subset as the \textbf{corpus} and the second
+subset as the \textbf{query}. This approach ensures that we do not calculate the distances between points within
+the same sub-block.
 
 Updating the nearest neighbors is achieved with the function \texttt{updateKNearestNeighbors}. It finds the (current) nearest neighbor with
 the biggest distance, and tries to replace it with the new neighbor. If the new neighbor is closer, it replaces the current one.
@@ -284,14 +297,9 @@ We tested it with OpenMP and the end results were Recall = $99.98\%$ and Queries
 This result beats the last sequential result (Recall = $57.21\%$, Queries per second = $135$) by a factor of $\times1.7$, 
 both in Recall and Queries per second.
 
-We can achieve even better performance by increasing the number of threads. Testing the same dataset with 8 threads and the
-results were slightly better, by a factor of $\times1.1-1.2$ in Queries per second. This is expected due to hardware
-bottlenecks, but it does allow us to fully utilize the CPU and boost performance.
-
-Comparing the benchmark results with \texttt{ann-benchmarks} for the same dataset, 
-we can see that our algorithm
-is pretty competitive, taking into account that their tests were run on 31 threads. 
-As it stands it only manages to beat \texttt{pg-vector}.
+We can achieve even better performance by increasing the number of threads. Testing the same dataset with 8 threads the
+results were slightly better, by a factor of $\times1.1-1.2$ in Queries per second, compared to 4 threads. This is expected due to hardware
+bottlenecks, but it does allow us to increase the utilization of the CPU and boost performance.
 
 \section{Algorithm correctness}
 The algorithm does produce correct results without bias, since there's randomness involved throughout the process.
