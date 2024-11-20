@@ -86,10 +86,7 @@ The data structures used in the parallel implementation are similar to the seque
     
 \end{itemize}
 
-\subsection{Initialization}
-We first create a struct called \texttt{Neighbor} that holds an \emph{index} and a \emph{distance}.
-The function \texttt{kNN} initializes an $n \times k$ array \texttt{nearestNeighbors} to store the nearest neighbors for each point.
-Each element in this array is initialized with a distance of \emph{INFINITY} and an index of $-1$.
+The initializations of the \texttt{nearestNeighbors} and \texttt{D} arrays are the same as in the sequential implementation.
 
 \subsection{Splitting data into blocks}
 Controlling memory usage is crucial, so we split the data randomly into \emph{blocks}. The randomess is achieved with the helper 
