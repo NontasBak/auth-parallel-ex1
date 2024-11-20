@@ -18,9 +18,11 @@
 
 \begin{abstract}
     This document explains the implementation of the \textbf{k-Nearest Neighbors (kNN)} algorithm in C, both in serial and parallel execution.
-    The focus will mainly be on the parallel execution using threads to improve the speed of the execution, assuming that $C=Q$, the
-    number of points in the dataset is in the millions and the number of dimensions is in the hundreds. It will also display how
-    we can efficiently manage the memory usage, by splitting the data into blocks.
+    
+    The primary focus is on parallel execution using threads to accelerate performance, particularly for large datasets. We consider scenatios 
+    where $C=Q$, the number of data points reaches millions and the dimensionality is in the hundreds. 
+
+    Additionally, the document explores efficient memory management techniques, such as data block partitioning, to optimize resource utilization.
 \end{abstract}
 
 \section{Distance calculation}
@@ -33,22 +35,56 @@ where $C$ is the \textbf{corpus} dataset with $m$ points and $d$ dimensions, and
 $C.^2$ and $Q.^2$ denote element-wise squaring of the matrices and summing along the columns.
 The function that implements the above is called \texttt{computeDistances}.
 
-\section{Sequential implementation}
-The \texttt{kNNsearch} function finds the k-nearest neighbors in the matrix $C$ for each point in the matrix $Q$.
-First, it splits the $Q$ matrix into \emph{blocks} in order minimize memory usage.
-Then, it calculates the distances between the points in each block $(Q1, Q2, \dots)$ and the points in the corpus matrix $C$.
-Finally, it finds the k-nearest neighbors and their distances using the function \texttt{quickSelect}.
 
-Our implementation aims to replicate the results of Matlab's \texttt{knnsearch} function, which is used to find the k-nearest neighbors.
-Thus, it will return 2 arrays \texttt{idx} and \texttt{dist}, where \texttt{idx} contains the indices of the nearest neighbors
-and \texttt{dist} contains the distances to the nearest neighbors.
-Since Matlab displays the nearest neighbors sorted, we also modified the \texttt{quickSelect} function to sort the k-nearest 
-neighbors by distance.
+\section{Sequential implementation}
+
+\subsection{Data structures} 
+
+\begin{itemize}
+    \item \texttt{Neighbor} struct: Represents a single neighbor of a data point. Contains an \texttt{index} and a \texttt{distance}.
+    \item \texttt{nearestNeighbors} array: An $n \times k$ array of \texttt{Neighbor} structures that stores the k-nearest neighbors for each point in the query dataset. During initialization, 
+    the values of \texttt{distance} and \texttt{index} are set to \emph{INFINITY} and $-1$ respectively.
+    \item \texttt{D} array: An $n \times m$ array that stores the distances between each pair of points in the query and corpus datasets.
+\end{itemize}
+
+\subsection{Algorithm}
+
+The \texttt{kNNsearch} function finds the k-nearest neighbors in matrix $C$ for each point in matrix $Q$.
+
+To optimize memory usage, $Q$ is divided into smaller \emph{blocks} $(Q1, Q2, \dots)$. 
+The distances between query points in \emph{each block} and \textbf{all} points in $C$ are then computed using the \texttt{computeDistances} function.
+Finally, the \texttt{quickSelect} function is called to efficiently determine the k-nearest neighbors for the current query and their corresponding distances.
+The results are stored in the \texttt{nearestNeighbors} array, after they are compared against previously stored neighbors.
+
+To match the behavior of MATLAB's \texttt{knnsearch} function, the \texttt{quickSelect} function is modified to sort the neighbors by distance.
+
+Additionally, the output of the \texttt{kNNsearch function} is given as a pair of arrays:
+\begin{itemize}
+    \item \texttt{idx} : Contains the indices of the k-nearest neighbors for each point in $Q$.
+    \item \texttt{dist}t : Contains the distances to the corresponding nearest neighbors.
+\end{itemize}
+
+By following this approach, our implementation aims to replicate the functionality and output format of MATLAB's \texttt{knnsearch} function.
+
+\subsection{Analysis}
+The sequential approach, while guaranteeing excellent accuracy, can be computationally expensive, particularly for large datasets. 
+This is due to the exhaustive calculation of distances between every pair of points, regardless of their proximity. 
+This indiscriminate computation often involves processing "far" points that ultimately contribute little to the final nearest neighbor determination.
+
 
 \section{Parallel implementation}
-We will assume $C=Q$ from now on and we will aim to find an \emph{approximate} solution for the k-nearest neighbors problem
-for large datasets (number of points in the millions, and dimensions between 3 and 1000).
 
+To efficiently handle large-scale datasets, we adopt a parallel computing approach that prioritizes speed over absolute precision. 
+By employing \emph{approximation} techniques, we aim to achieve a balance between computational efficiency and solution quality.
+
+To simplify our analysis, we will assume that $C==Q$. We will consider datasets with millions of points and dimensions between 3 and 1000.
+
+\subsection{Data structures}
+The data structures used in the parallel implementation are similar to the sequential version, with the addition of a few key elements:
+\begin{itemize}
+    \item \texttt{shuffledIndices} array: Contains the shuffled indices of the points in the dataset.
+    
+\end{itemize}
 
 \subsection{Initialization}
 We first create a struct called \texttt{Neighbor} that holds an \emph{index} and a \emph{distance}.
