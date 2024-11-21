@@ -63,9 +63,11 @@ CILK_NWORKERS=4 ./knn_opencilk
 ### Modifications
 - To change the number of threads (default: 4), change the constant `NUM_THREADS`
 - To change the number of blocks (default: 100), go to the `main` function and change the variable `numBlocks`.
-- To change the sub-block ratio (default: 0.5 = 50%), change the variable `subBlockRatio`
+- To change the sub-block ratio (default: 0.05 = 5%), change the variable `subBlockRatio`
 
 If your computer is struggling with memory usage, lower the number of threads and increase the number of blocks.
+
+If you want a higher **Recall**, increase the `subBlockRatio` (max = 1).
 
 ### About this project
 1st exercise of class Parallel and Distributed Systems @AUTH
