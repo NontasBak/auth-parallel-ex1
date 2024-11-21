@@ -154,10 +154,8 @@ void processBlockPairDistances(const double *D, int *shuffledIndices, int blockS
     }
 }
 
-void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, float subBlockRatio) {
+void kNN(double *C, int n, int d, int k, Neighbor *nearestNeighbors, int numBlocks, float subBlockRatio) {
     srand(time(NULL));
-
-    Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
 
     // Initialize nearestNeighbors
     for (int i = 0; i < n * k; i++) {
@@ -231,16 +229,7 @@ void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, 
         }
     }
 
-    // Copy the results to the output arrays
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < k; j++) {
-            dist[i * k + j] = nearestNeighbors[i * k + j].distance;
-            idx[i * k + j] = nearestNeighbors[i * k + j].index;
-        }
-    }
-
     free(shuffledIndices);
-    free(nearestNeighbors);
 }
 
 int main(int argc, char *argv[]) {
@@ -249,11 +238,10 @@ int main(int argc, char *argv[]) {
     int d = 128; // Number of dimensions
     int k = 100; // Number of nearest neighbors
     int numBlocks = 100;
-    float subBlockRatio = 0.5;
+    float subBlockRatio = 0.05;
 
     double *C = (double *)malloc(m * d * sizeof(double));
-    double *dist = (double *)malloc(n * k * sizeof(double));
-    int *idx = (int *)malloc(n * k * sizeof(int));
+    Neighbor *nearestNeighbors = (Neighbor *)malloc(n * k * sizeof(Neighbor));
 
     // Load .mat file
     loadMatFile("data/train_data.mat", "train_data", C, d, m, "float");
@@ -261,7 +249,7 @@ int main(int argc, char *argv[]) {
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    kNN(C, n, d, k, dist, idx, numBlocks, subBlockRatio);
+    kNN(C, n, d, k, nearestNeighbors, numBlocks, subBlockRatio);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     double elapsedTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
@@ -274,7 +262,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < numTestQueries; i++) {
         for (int j = 0; j < k; j++) {
             for (int l = 0; l < k; l++) {
-                if (idx[i * k + j] == (int)groundTruth[i * k + l] - 1) {
+                if (nearestNeighbors[i * k + j].index == (int)groundTruth[i * k + l] - 1) {
                     correctNeighbors++;
                     break;
                 }
@@ -289,8 +277,7 @@ int main(int argc, char *argv[]) {
     printf("Queries per second: %.2f\n", queriesPerSecond);
 
     free(C);
-    free(dist);
-    free(idx);
+    free(nearestNeighbors);
     free(groundTruth);
 
     return 0;

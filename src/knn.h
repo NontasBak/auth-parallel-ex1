@@ -28,12 +28,11 @@ void kNNsearch(double *C, double *Q, int m, int n, int d, int k, double *dist, i
  * @param n Number of points 
  * @param d Number of dimensions
  * @param k Number of neighbors
- * @param dist Distance of nearest neighbors [n by k]
- * @param idx Indeces of nearest neighbors [n by k]
+ * @param nearestNeighbors Array of nearest neighbors
  * @param numBlocks Number of blocks to split the points
  * @param subBlockRatio Size of each sub block when comparing blocks with each other (0, 1]
  */
-void kNN(double *C, int n, int d, int k, double *dist, int *idx, int numBlocks, float subBlockRatio);
+void kNN(double *C, int n, int d, int k, Neighbor *nearestNeighbors, int numBlocks, float subBlockRatio);
 
 /**
  * @brief Compute the distances between corpus and query points
