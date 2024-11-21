@@ -27,18 +27,18 @@ Parallel implementation of the k-NN algorithm using OpenMP, Pthreads and OpenCil
 
 PC specs: i5-11400F (6 cores, 12 threads), 16GB RAM, Linux Mint
 
-Test data: SIFT-128-euclidean
+Test data: SIFT-128-euclidean [(Download here)](https://github.com/erikbern/ann-benchmarks)
 
 All parallel tests run on **4 threads**
 
-### How it works
-1. Split the data points in *blocks* (ex. 100 blocks, with 10k points each if we have 1M points)
-2. *Within* each block, calculate the distances between the points and find the k-NN
-3. Find new neighbors by taking a *subset* of the points from 2 blocks (ex. 50%), calculate the new distances and update the k-NN if necessary
-4. Do this for all block pairs
+> [!IMPORTANT]  
+> Sequential benchmarks are not to be confused with the file `knn_sequential.c` that finds the exact solution.
 
-> [!NOTE]
-> In step 1 the points in each block are chosen **randomly** and not sequential. In step 3 the points in each subset are chosen **randomly**.
+### How it works
+1. Split the data points randomly in *blocks* (ex. 100 blocks, with 10k points each if we have 1M points)
+2. *Within* each block, calculate the distances between the points and find the k-NN
+3. Find new neighbors by taking a random *subset* of the points from 2 blocks (ex. 50%), calculate the new distances and update the k-NN if necessary
+4. Do this for all block pairs
 
 ### How to run 
 
@@ -48,7 +48,7 @@ sudo apt-get install libopenblas-dev libmatio-dev
 ```
 
 2. Move the **sift-128-euclidean.hdf5** file inside the directory `data`
-3. Run the Matlab code **knn_data.m** to convert it to a .mat file.
+3. Run the Matlab code **knn_data.m** (inside the directory `utils`) to convert it to a .mat file.
 4. Change inside the Makefile the variable `OPENCILK_COMPILER` [Learn more](https://www.opencilk.org/doc/users-guide/install/)
 5. Run `make`
 6. Run any of the binaries:
